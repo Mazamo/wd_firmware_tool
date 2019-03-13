@@ -1,6 +1,10 @@
 #ifndef ROM_MANAGEMENT_H
 #define ROM_MANAGEMENT_H
 
+/* Size of the ROM eeprom used on a WD hard disk drive. */
+#define ROM_IMAGE_SIZE          256 * 1024
+#define ROM_IMAGE_BLOCK_SIZE    64  * 1024
+
 /* Dumps the rom image from a wd hard disk drive. */
 int dump_rom_image(char *hard_disk_dev_file, char *out_file);
 

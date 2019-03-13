@@ -11,24 +11,9 @@
 /* Application specific */
 #include "includes/rom_management.h"
 
-int scan_hard_disk_drives(void)
-{
-
-}
-
-void display_options(char *app_name)
-{
-    printf("Usage:\n");
-    printf("Dump ROM image: %s -d <hard disk location> <filename>\n",
-        app_name);
-    printf("Print info blocks: %s -i <rom file>\n", app_name);
-    printf("Load ROM image: %s -l <hard disk location> <rom file>\n",
-        app_name);
-    printf("Pack image: %s -p <rom file>\n", app_name);
-    printf("Add block: %s -p <rom file> <block file>\n", app_name);
-    printf("Hard disk scan: %s -s\n", app_name);
-    return;
-}
+/* Function prototypes: */
+int scan_hard_disk_drives(void); /* Scan for all connected hard disk drive */
+void display_options(char *app_name); /* Display the application's options */
 
 int main(int argc, char *argv[])
 {
@@ -54,6 +39,8 @@ int main(int argc, char *argv[])
             fprintf(stderr, "main: Could not dump rom image.\n");
             exit(1);
         }
+
+        printf("Finished dumping rom to %s\n", argv[3]);
     }
     else if(strcmp(argv[1], "-l") == 0)
     {
@@ -86,4 +73,23 @@ int main(int argc, char *argv[])
     }
 
     return 0;
+}
+
+int scan_hard_disk_drives(void)
+{
+    return 0;
+}
+
+void display_options(char *app_name)
+{
+    printf("Usage:\n");
+    printf("Dump ROM image: %s -d <hard disk location> <filename>\n",
+        app_name);
+    printf("Print info blocks: %s -i <rom file>\n", app_name);
+    printf("Load ROM image: %s -l <hard disk location> <rom file>\n",
+        app_name);
+    printf("Pack image: %s -p <rom file>\n", app_name);
+    printf("Add block: %s -p <rom file> <block file>\n", app_name);
+    printf("Hard disk scan: %s -s\n", app_name);
+    return;
 }
