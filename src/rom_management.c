@@ -43,12 +43,9 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     int hdd_fd = open_hard_disk_drive(hard_disk_dev_file);
     if(hdd_fd == -1)
     {
-        fprintf(stderr, "dump_rom_image: Could not open specified file.\n");
+        fprintf(stderr, "dump_rom_image: Could not handle hard disk drive.\n");
         return -1;
     }
-
-    close(hdd_fd);
-    return 0;
 
     printf("Allocating memory for rom image\n");
     rom_image_buffer = calloc(ROM_IMAGE_SIZE, 1);
@@ -60,7 +57,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     }
 
     printf("Enabling vendor specific commands\n");
-    if(enable_vendor_specific_commands() == -1)
+    if(enable_vendor_specific_commands(hdd_fd) == -1)
     {
         fprintf(stderr, "dump_rom_image: Could not enable " \
             "vendor specific commands.\n");
@@ -69,8 +66,12 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
         return -1;
     }
 
+    close(hdd_fd);
+    free(rom_image_buffer);
+    return 0;
+
     printf("Getting access to rom.\n");
-    if(get_rom_access() == -1)
+    if(get_rom_access(hdd_fd) == -1)
     {
         fprintf(stderr, "get_rom_acces: Could not get rom access.\n");
         free(rom_image_buffer);
@@ -84,7 +85,8 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     /* Request the ROM image using 64KiB block requests. */
     for(i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE)
     {
-        if(read_rom_block(rom_image_buffer + i, ROM_IMAGE_BLOCK_SIZE) == -1)
+        if(read_rom_block(hdd_fd, rom_image_buffer + i, ROM_IMAGE_BLOCK_SIZE)
+            == -1)
         {
             fprintf(stderr, "dump_rom_image: Could not read the %drom block\n",
                 (i / ROM_IMAGE_BLOCK_SIZE) + 1);
@@ -95,7 +97,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     }
 
     printf("Disabling vendor specific commands\n");
-    if(disable_vendor_specific_commands() == -1)
+    if(disable_vendor_specific_commands(hdd_fd) == -1)
     {
         fprintf(stderr, "dump_rom_image: Could not disable " \
             "vendor specific commands.\n");

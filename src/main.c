@@ -7,13 +7,23 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <unistd.h>
+
+
 
 /* Application specific */
 #include "includes/rom_management.h"
 
 /* Function prototypes: */
-int scan_hard_disk_drives(void); /* Scan for all connected hard disk drive */
-void display_options(char *app_name); /* Display the application's options */
+
+ /* Scan for all connected hard disk drive */
+static int scan_hard_disk_drives(void);
+
+/* Display the application's options */
+static void display_options(char *app_name);
+
+/* Check if the process has enough privilidges to perform an action */
+static inline int check_root_permission(void);
 
 int main(int argc, char *argv[])
 {
@@ -32,11 +42,17 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
+        if(check_root_permission() != 0)
+        {
+            fprintf(stderr, "main: Application should be run as root.\n");
+            exit(1);
+        }
+
         /* argv[2] = hard disk location */
         /* argv[3] = output file */
         if(dump_rom_image(argv[2], argv[3]) == -1)
         {
-            fprintf(stderr, "main: Could not dump rom image.\n");
+            fprintf(stderr, "main: Could not dump rom image from the disk.\n");
             exit(1);
         }
 
@@ -92,4 +108,16 @@ void display_options(char *app_name)
     printf("Add block: %s -p <rom file> <block file>\n", app_name);
     printf("Hard disk scan: %s -s\n", app_name);
     return;
+}
+
+static inline int check_root_permission(void)
+{
+    if(getuid() == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
