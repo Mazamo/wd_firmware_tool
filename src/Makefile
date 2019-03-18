@@ -1,9 +1,9 @@
 SRCS=$(wildcard *.c)
 OBJS=$(patsubst %.c,%.o,$(SRCS))
-CFLAGS =	-O2 -g -Wall -fmessage-length=0
+CFLAGS =	-g -Wall -fmessage-length=0
 LIBS =
 
-TARGET =	main
+TARGET = 	wd_firmware_tool
 
 $(TARGET):	$(OBJS)
 	$(CC) -o $(TARGET) $(OBJS) $(LIBS)
