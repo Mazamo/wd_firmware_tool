@@ -1,7 +1,7 @@
 sg_hdr identify:
 {
   interface_id = 0x53, 					; 'S'
-  dxfer_direction = 0xfffffffd, 			; 
+  dxfer_direction = 0xfffffffd, 			; Read
   cmd_len = 0x10, 
   mx_sb_len = 0x20, 
   iovec_count = 0x0, 
@@ -102,7 +102,7 @@ sg_hdr smart log read rom:
   info = 0x0
 }
 
- {
+{
   interface_id = 0x53, 
   dxfer_direction = 0xfffffffd, 
   cmd_len = 0x10, 

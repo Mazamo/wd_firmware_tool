@@ -61,7 +61,7 @@ int enable_vendor_specific_commands(int hard_disk_file_descriptor);
 int disable_vendor_specific_commands(int hard_disk_file_descriptor);
 
 /* Send a packet that enables rom access */
-int get_rom_access(int hard_disk_file_descriptor);
+int get_rom_acces(int hard_disk_file_descriptor);
 
 /* Read a rom block from the hard disk drive */
 int read_rom_block(int hard_disk_file_descriptor, void *block,

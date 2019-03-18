@@ -66,12 +66,8 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
         return -1;
     }
 
-    close(hdd_fd);
-    free(rom_image_buffer);
-    return 0;
-
     printf("Getting access to rom.\n");
-    if(get_rom_access(hdd_fd) == -1)
+    if(get_rom_acces(hdd_fd) == -1)
     {
         fprintf(stderr, "get_rom_acces: Could not get rom access.\n");
         free(rom_image_buffer);

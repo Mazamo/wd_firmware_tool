@@ -36,21 +36,18 @@ static inline int calculate_pack_id(unsigned char *cdb);
 
 int open_hard_disk_drive(char *hard_disk_dev_file)
 {
-    if(strncmp(hard_disk_dev_file, "/dev/s", sizeof("/dev/s") - 1) != 0)
-    {
+    if (strncmp(hard_disk_dev_file, "/dev/s", sizeof("/dev/s") - 1) != 0) {
         fprintf(stderr, "open_hard_disk_drive: Invalid device file.\n");
         return -1;
     }
 
     int fd = open(hard_disk_dev_file, O_RDWR);
-    if(fd == -1)
-    {
+    if (fd == -1) {
         perror("open:");
         return -1;
     }
 
-    if(identify_hard_disk_drive(fd) == -1)
-    {
+    if (identify_hard_disk_drive(fd) == -1) {
         fprintf(stderr, "open_hard_disk_drive: Specified hard disk drive is " \
             "not supported\n");
         return -1;
@@ -59,8 +56,11 @@ int open_hard_disk_drive(char *hard_disk_dev_file)
     return fd;
 }
 
-/* For more info about cdb and sg_io:
-http://www.t13.org/documents/uploadeddocuments/docs2006/d1699r3f-ata8-acs.pdf*/
+/*
+* For more info about cdb and sg_io:
+* http://www.t13.org/documents/uploadeddocuments/docs2006/d1699r3f-ata8-acs.pdf
+* http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO/sg_io_hdr_t.html
+*/
 int identify_hard_disk_drive(int hard_disk_file_descriptor)
 {
     unsigned char identify_cdb[SG_ATA_16_LEN];
@@ -90,9 +90,8 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     uint8_t identify_reply_buffer[512 * 2];
     memset(identify_reply_buffer, 0, sizeof(identify_reply_buffer));
 
-    if(execute_command(identify_cdb, hard_disk_file_descriptor,
-        identify_reply_buffer, 512, SG_DXFER_FROM_DEV) == -1)
-    {
+    if (execute_command(identify_cdb, hard_disk_file_descriptor,
+        identify_reply_buffer, 512, SG_DXFER_FROM_DEV) == -1) {
         fprintf(stderr, "identify_hard_disk_drive: Could not send identify " \
             "command to hard disk drive.\n");
         return -1;
@@ -111,10 +110,9 @@ static void display_model(uint8_t *hard_disk_response)
     int i;
 
     /* Range in which the the model number of the hard disk is stored. */
-    for(i = IDENTIFY_MODEL_NUMBER_START; i < IDENTIFY_MODEL_NUMBER_END; i += 2)
-    {
-        if(hard_disk_response[i] == 0)
-        {
+    for (i = IDENTIFY_MODEL_NUMBER_START;
+        i < IDENTIFY_MODEL_NUMBER_END; i += 2) {
+        if (hard_disk_response[i] == 0) {
             break;
         }
 
@@ -129,11 +127,9 @@ static void display_firmware_revision(uint8_t *hard_disk_response)
     printf("Firmeware revision: ");
     int i;
 
-    for(i = IDENTIFY_FIRMWARE_REVISION_START ;
-        i < IDENTIFY_FIRMWARE_REVISION_END; ++i)
-    {
-        if(hard_disk_response[i] == 0)
-        {
+    for (i = IDENTIFY_FIRMWARE_REVISION_START ;
+        i < IDENTIFY_FIRMWARE_REVISION_END; ++i) {
+        if (hard_disk_response[i] == 0) {
             break;
         }
 
@@ -148,20 +144,17 @@ static void display_serial_number(uint8_t *hard_disk_response)
     printf("Serial number: ");
     int i;
 
-    for(i = IDENTIFY_SERIAL_NUMBER_START; i < IDENTIFY_SERIAL_NUMBER_END; ++i)
-    {
-        if(hard_disk_response[i] == 0)
-        {
+    for (i = IDENTIFY_SERIAL_NUMBER_START;
+        i < IDENTIFY_SERIAL_NUMBER_END; ++i) {
+        if (hard_disk_response[i] == 0) {
             break;
         }
 
-        if(hard_disk_response[i + 1] != ' ')
-        {
+        if (hard_disk_response[i + 1] != ' ') {
             putchar(hard_disk_response[i+1]);
         }
 
-        if(hard_disk_response[i] != ' ')
-        {
+        if (hard_disk_response[i] != ' ') {
             putchar(hard_disk_response[i]);
         }
     }
@@ -170,9 +163,8 @@ static void display_serial_number(uint8_t *hard_disk_response)
 
 int verify_hard_disk_support(uint8_t *hard_disk_response)
 {
-    if(hard_disk_response[54] != 'D' || hard_disk_response[55] != 'W'
-        || hard_disk_response[57] != 'C')
-    {
+    if (hard_disk_response[54] != 'D' || hard_disk_response[55] != 'W'
+        || hard_disk_response[57] != 'C') {
         return -1;
     }
 
@@ -207,9 +199,8 @@ int enable_vendor_specific_commands(int hard_disk_file_descriptor)
     enable_vsc_cdb[14]    = ATA_VENDOR_SPECIFIC_COMMAND;
     enable_vsc_cdb[15]    = 0x00; /* Control: */
 
-    if(execute_command(enable_vsc_cdb, hard_disk_file_descriptor,
-        NULL, 0, SG_DXFER_NONE) == -1)
-    {
+    if (execute_command(enable_vsc_cdb, hard_disk_file_descriptor,
+        NULL, 0, SG_DXFER_NONE) == -1) {
         fprintf(stderr, "enable_vendor_specific_commands: Could not send " \
             " enable vcs command to hard disk drive.\n");
         return -1;
@@ -226,29 +217,28 @@ int disable_vendor_specific_commands(int hard_disk_file_descriptor)
 
     /* multiple count: 0 protocol: 4 extended: 0  */
     /* protocol 4: PIO Data-In */
-    disable_vsc_cdb[1]     = 0x08;
+    disable_vsc_cdb[1]     = 0x06;
 
     /* off.line: cc: lh.en: ll.en: sc.en: f.en: */
-    disable_vsc_cdb[2]     = 0x2e;
+    disable_vsc_cdb[2]     = 0x20;
     disable_vsc_cdb[3]     = 0x00; /* Features (8:15): */
-    disable_vsc_cdb[4]     = 0xd5; /* Features (0:7): */
+    disable_vsc_cdb[4]     = 0x44; /* Features (0:7): */
     disable_vsc_cdb[5]     = 0x00; /* Sector Count (8:15): */
-    disable_vsc_cdb[6]     = 0x80; /* Sector Count (0:7): */
+    disable_vsc_cdb[6]     = 0x00; /* Sector Count (0:7): */
     disable_vsc_cdb[7]     = 0x00; /* LBA Low (8:15): */
-    disable_vsc_cdb[8]     = 0xbf; /* LBA Low (0:7): */
+    disable_vsc_cdb[8]     = 0x00; /* LBA Low (0:7): */
     disable_vsc_cdb[9]     = 0x00; /* LBA Mid (8:15): */
-    disable_vsc_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
+    disable_vsc_cdb[10]    = 0x44; /* LBA Mid (0:7): */
     disable_vsc_cdb[11]    = 0x00; /* LBA High (8:15): */
-    disable_vsc_cdb[12]    = 0xc2; /* LBA High (0:7): */
+    disable_vsc_cdb[12]    = 0x57; /* LBA High (0:7): */
     disable_vsc_cdb[13]    = 0xa0; /* Device: */
 
     /* Command: Vendor Specific Command */
     disable_vsc_cdb[14]    = ATA_VENDOR_SPECIFIC_COMMAND;
     disable_vsc_cdb[15]    = 0x00; /* Control: */
 
-    if(execute_command(disable_vsc_cdb, hard_disk_file_descriptor,
-        NULL, 0, SG_DXFER_NONE) == -1)
-    {
+    if (execute_command(disable_vsc_cdb, hard_disk_file_descriptor,
+        NULL, 0, SG_DXFER_NONE) == -1) {
         fprintf(stderr, "disable_vendor_specific_commands: Could not send " \
             " enable vcs command to hard disk drive.\n");
         return -1;
@@ -291,9 +281,8 @@ int get_rom_acces(int hard_disk_file_descriptor)
     command_buffer[2] = ROM_KEY_READ;
 
 
-    if(execute_command(get_rom_access_cdb, hard_disk_file_descriptor,
-        command_buffer, 512, SG_DXFER_TO_FROM_DEV) == -1)
-    {
+    if (execute_command(get_rom_access_cdb, hard_disk_file_descriptor,
+        command_buffer, 512, SG_DXFER_TO_DEV) == -1) {
         fprintf(stderr, "get_rom_acces: Could not send " \
             " smart log enable rom command to hard disk drive.\n");
         return -1;
@@ -329,9 +318,8 @@ int read_rom_block(int hard_disk_file_descriptor, void *block,
     read_rom_block_cdb[14]    = ATA_OP_SMART; /* Command: smart ata operation */
     read_rom_block_cdb[15]    = 0x00; /* Control: */
 
-    if(execute_command(read_rom_block_cdb, hard_disk_file_descriptor,
-        block, size, SG_DXFER_FROM_DEV) == -1)
-    {
+    if (execute_command(read_rom_block_cdb, hard_disk_file_descriptor,
+        block, size, SG_DXFER_FROM_DEV) == -1) {
         fprintf(stderr, "read_rom_block: Could not send smart log " \
             "read rom command to hard disk drive.\n");
         return -1;
@@ -368,9 +356,8 @@ int write_rom_block(int hard_disk_file_descriptor, void *block,
     read_rom_block_cdb[14]    = ATA_OP_SMART; /* Command: smart ata operation */
     read_rom_block_cdb[15]    = 0x00; /* Control: */
 
-    if(execute_command(read_rom_block_cdb, hard_disk_file_descriptor,
-        block, size, SG_DXFER_TO_DEV) == -1)
-    {
+    if (execute_command(read_rom_block_cdb, hard_disk_file_descriptor,
+        block, size, SG_DXFER_TO_DEV) == -1) {
         fprintf(stderr, "read_rom_block: Could not send smart log " \
             "read rom command to hard disk drive.\n");
         return -1;
@@ -393,8 +380,7 @@ static inline int calculate_pack_id(unsigned char *cdb)
 static inline void display_sense_buffer(unsigned char sense_buffer[32])
 {
     int i;
-    for(i = 0; i < 32; ++i)
-    {
+    for (i = 0; i < 32; ++i) {
         fprintf(stderr, "%hx ", (unsigned short) sense_buffer[i]);
     }
     fprintf(stderr, "\n");
@@ -423,31 +409,29 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO/x249.html*/
     io_hdr.pack_id = calculate_pack_id(cdb);
 
-    if(ioctl(hard_disk_file_descriptor, SG_IO, &io_hdr) < 0)
-    {
+    if (ioctl(hard_disk_file_descriptor, SG_IO, &io_hdr) < 0) {
         perror("ioctl: ");
         display_sense_buffer(sense_buffer);
         return -1;
     }
 
-    if(io_hdr.host_status || io_hdr.driver_status != SG_DRIVER_SENSE ||
-        (io_hdr.status && io_hdr.status != SG_CHECK_CONDITION))
-    {
+    return 0;
+
+    if (io_hdr.host_status || io_hdr.driver_status != SG_DRIVER_SENSE ||
+        (io_hdr.status && io_hdr.status != SG_CHECK_CONDITION)) {
         fprintf(stderr, "execute_command: Received error response\n");
         display_sense_buffer(sense_buffer);
         return -1;
     }
 
-    if(sense_buffer[0] != 0x72 || sense_buffer[7] < 14 ||
-        sense_buffer[8] != 0x09 || sense_buffer[9] < 0x0c)
-    {
+    if (sense_buffer[0] != 0x72 || sense_buffer[7] < 14 ||
+        sense_buffer[8] != 0x09 || sense_buffer[9] < 0x0c) {
         fprintf(stderr, "execute_command: Detected error in sense buffer\n");
         display_sense_buffer(sense_buffer);
         return -1;
     }
 
-    if(sense_buffer[21] & (ATA_STAT_ERR | ATA_STAT_DRQ))
-    {
+    if (sense_buffer[21] & (ATA_STAT_ERR | ATA_STAT_DRQ)) {
         fprintf(stderr, "execute_command: Detected I/O error\n");
         fprintf(stderr, "ata operation: 0x%02x\n", cdb[14]);
         fprintf(stderr, "ata status:    0x%02x\n", sense_buffer[21]);
