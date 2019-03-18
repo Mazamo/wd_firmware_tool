@@ -8,6 +8,9 @@
 /* Dumps the rom image from a wd hard disk drive. */
 int dump_rom_image(char *hard_disk_dev_file, char *out_file);
 
+/* Upload the rom image to a wd hard disk drive. */
+int upload_rom_image(char *hard_disk_dev_file, char *in_file);
+
 /* Unpacks a packed rom image. */
 int unpack_rom_image(char *rom_image);
 

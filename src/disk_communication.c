@@ -247,8 +247,13 @@ int disable_vendor_specific_commands(int hard_disk_file_descriptor)
     return 0;
 }
 
-int get_rom_acces(int hard_disk_file_descriptor)
+int get_rom_acces(int hard_disk_file_descriptor, int read_write)
 {
+    if (read_write != ROM_KEY_READ && read_write != ROM_KEY_WRTIE) {
+        fprintf(stderr, "get_rom_acces: Invallid read/write direction.\n");
+        return -1;
+    }
+
     unsigned char get_rom_access_cdb[SG_ATA_16_LEN];
 
     get_rom_access_cdb[0]     = SG_ATA_16; /* operation code: SG_ATA_16 */
@@ -262,11 +267,11 @@ int get_rom_acces(int hard_disk_file_descriptor)
     get_rom_access_cdb[3]     = 0x00; /* Features (8:15): */
     get_rom_access_cdb[4]     = 0xd6; /* Features (0:7): */
     get_rom_access_cdb[5]     = 0x00; /* Sector Count (8:15): */
-    get_rom_access_cdb[6]     = 0x01; /* Sector Count (0:7): */
+    get_rom_access_cdb[6]     = 0x80; /* Sector Count (0:7): */
     get_rom_access_cdb[7]     = 0x00; /* LBA Low (8:15): */
-    get_rom_access_cdb[8]     = 0xbe; /* LBA Low (0:7): */
+    get_rom_access_cdb[8]     = 0xbf; /* LBA Low (0:7): */
     get_rom_access_cdb[9]     = 0x00; /* LBA Mid (8:15): */
-    get_rom_access_cdb[10]    = 0x47; /* LBA Mid (0:7): */
+    get_rom_access_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
     get_rom_access_cdb[11]    = 0x00; /* LBA High (8:15): */
     get_rom_access_cdb[12]    = 0xc2; /* LBA High (0:7): */
     get_rom_access_cdb[13]    = 0xa0; /* Device: */
@@ -274,12 +279,11 @@ int get_rom_acces(int hard_disk_file_descriptor)
     get_rom_access_cdb[14]    = ATA_OP_SMART; /* Command: smart ata operation */
     get_rom_access_cdb[15]    = 0x00; /* Control: */
 
-    uint8_t command_buffer[512 * 2];
+    uint8_t command_buffer[512];
     memset(command_buffer, 0, sizeof(command_buffer));
 
     command_buffer[0] = 0x24; /* Command */
-    command_buffer[2] = ROM_KEY_READ;
-
+    command_buffer[2] = read_write;
 
     if (execute_command(get_rom_access_cdb, hard_disk_file_descriptor,
         command_buffer, 512, SG_DXFER_TO_DEV) == -1) {
@@ -328,38 +332,37 @@ int read_rom_block(int hard_disk_file_descriptor, void *block,
     return 0;
 }
 
-/* TODO: Check cdb */
 int write_rom_block(int hard_disk_file_descriptor, void *block,
     unsigned int size)
 {
-    unsigned char read_rom_block_cdb[SG_ATA_16_LEN];
+    unsigned char write_rom_block_cdb[SG_ATA_16_LEN];
 
-    read_rom_block_cdb[0]     = SG_ATA_16; /* operation code: SG_ATA_16 */
+    write_rom_block_cdb[0]     = SG_ATA_16; /* operation code: SG_ATA_16 */
 
     /* multiple count: 0 protocol: 4 extended: 0  */
     /* protocol 4: PIO Data-In */
-    read_rom_block_cdb[1]     = 0x08;
+    write_rom_block_cdb[1]     = 0x08;
 
     /* off.line: cc: lh.en: ll.en: sc.en: f.en: */
-    read_rom_block_cdb[2]     = 0x2e;
-    read_rom_block_cdb[3]     = 0x00; /* Features (8:15): */
-    read_rom_block_cdb[4]     = 0xd6; /* Features (0:7): */
-    read_rom_block_cdb[5]     = 0x00; /* Sector Count (8:15): */
-    read_rom_block_cdb[6]     = 0x80; /* Sector Count (0:7): */
-    read_rom_block_cdb[7]     = 0x00; /* LBA Low (8:15): */
-    read_rom_block_cdb[8]     = 0xbf; /* LBA Low (0:7): */
-    read_rom_block_cdb[9]     = 0x00; /* LBA Mid (8:15): */
-    read_rom_block_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
-    read_rom_block_cdb[11]    = 0x00; /* LBA High (8:15): */
-    read_rom_block_cdb[12]    = 0xc2; /* LBA High (0:7): */
-    read_rom_block_cdb[13]    = 0xa0; /* Device: */
-    read_rom_block_cdb[14]    = ATA_OP_SMART; /* Command: smart ata operation */
-    read_rom_block_cdb[15]    = 0x00; /* Control: */
+    write_rom_block_cdb[2]     = 0x2e;
+    write_rom_block_cdb[3]     = 0x00; /* Features (8:15): */
+    write_rom_block_cdb[4]     = 0xd6; /* Features (0:7): */
+    write_rom_block_cdb[5]     = 0x00; /* Sector Count (8:15): */
+    write_rom_block_cdb[6]     = 0x80; /* Sector Count (0:7): */
+    write_rom_block_cdb[7]     = 0x00; /* LBA Low (8:15): */
+    write_rom_block_cdb[8]     = 0xbf; /* LBA Low (0:7): */
+    write_rom_block_cdb[9]     = 0x00; /* LBA Mid (8:15): */
+    write_rom_block_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
+    write_rom_block_cdb[11]    = 0x00; /* LBA High (8:15): */
+    write_rom_block_cdb[12]    = 0xc2; /* LBA High (0:7): */
+    write_rom_block_cdb[13]    = 0xa0; /* Device: */
+    write_rom_block_cdb[14]    = ATA_OP_SMART; /* Command: smart ata operation */
+    write_rom_block_cdb[15]    = 0x00; /* Control: */
 
-    if (execute_command(read_rom_block_cdb, hard_disk_file_descriptor,
+    if (execute_command(write_rom_block_cdb, hard_disk_file_descriptor,
         block, size, SG_DXFER_TO_DEV) == -1) {
-        fprintf(stderr, "read_rom_block: Could not send smart log " \
-            "read rom command to hard disk drive.\n");
+        fprintf(stderr, "write_rom_block: Could not send smart log " \
+            "write rom command to hard disk drive.\n");
         return -1;
     }
 
@@ -394,6 +397,7 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     unsigned char sense_buffer[32];
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    memset(&sense_buffer, 0, sizeof(sense_buffer));
 
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = SG_ATA_16_LEN;
@@ -415,8 +419,6 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
         return -1;
     }
 
-    return 0;
-
     if (io_hdr.host_status || io_hdr.driver_status != SG_DRIVER_SENSE ||
         (io_hdr.status && io_hdr.status != SG_CHECK_CONDITION)) {
         fprintf(stderr, "execute_command: Received error response\n");
@@ -424,11 +426,14 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
         return -1;
     }
 
+    /*
+    * This is not necessarly a failure and thus returns another warning message.
+    */
     if (sense_buffer[0] != 0x72 || sense_buffer[7] < 14 ||
         sense_buffer[8] != 0x09 || sense_buffer[9] < 0x0c) {
         fprintf(stderr, "execute_command: Detected error in sense buffer\n");
         display_sense_buffer(sense_buffer);
-        return -1;
+        return -2;
     }
 
     if (sense_buffer[21] & (ATA_STAT_ERR | ATA_STAT_DRQ)) {

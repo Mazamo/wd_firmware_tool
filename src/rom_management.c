@@ -41,24 +41,21 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     int output_file;
 
     int hdd_fd = open_hard_disk_drive(hard_disk_dev_file);
-    if(hdd_fd == -1)
-    {
+    if (hdd_fd == -1) {
         fprintf(stderr, "dump_rom_image: Could not handle hard disk drive.\n");
         return -1;
     }
 
     printf("Allocating memory for rom image\n");
     rom_image_buffer = calloc(ROM_IMAGE_SIZE, 1);
-    if(rom_image_buffer == NULL)
-    {
+    if (rom_image_buffer == NULL) {
         perror("calloc:");
         close(hdd_fd);
         return -1;
     }
 
     printf("Enabling vendor specific commands\n");
-    if(enable_vendor_specific_commands(hdd_fd) == -1)
-    {
+    if (enable_vendor_specific_commands(hdd_fd) == -1) {
         fprintf(stderr, "dump_rom_image: Could not enable " \
             "vendor specific commands.\n");
         free(rom_image_buffer);
@@ -67,9 +64,8 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     }
 
     printf("Getting access to rom.\n");
-    if(get_rom_acces(hdd_fd) == -1)
-    {
-        fprintf(stderr, "get_rom_acces: Could not get rom access.\n");
+    if (get_rom_acces(hdd_fd, ROM_KEY_READ) == -1) {
+        fprintf(stderr, "dump_rom_image: Could not get rom read access.\n");
         free(rom_image_buffer);
         close(hdd_fd);
         return -1;
@@ -79,13 +75,11 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
 
     printf("Dumping rom\n");
     /* Request the ROM image using 64KiB block requests. */
-    for(i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE)
-    {
-        if(read_rom_block(hdd_fd, rom_image_buffer + i, ROM_IMAGE_BLOCK_SIZE)
-            == -1)
-        {
-            fprintf(stderr, "dump_rom_image: Could not read the %drom block\n",
-                (i / ROM_IMAGE_BLOCK_SIZE) + 1);
+    for (i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE) {
+        if (read_rom_block(hdd_fd, &rom_image_buffer[i], ROM_IMAGE_BLOCK_SIZE)
+            == -1) {
+            fprintf(stderr, "dump_rom_image: Could not read rom block: %d\n",
+                (i / ROM_IMAGE_BLOCK_SIZE));
             free(rom_image_buffer);
             close(hdd_fd);
             return -1;
@@ -93,8 +87,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     }
 
     printf("Disabling vendor specific commands\n");
-    if(disable_vendor_specific_commands(hdd_fd) == -1)
-    {
+    if (disable_vendor_specific_commands(hdd_fd) == -1) {
         fprintf(stderr, "dump_rom_image: Could not disable " \
             "vendor specific commands.\n");
         free(rom_image_buffer);
@@ -105,15 +98,13 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     close(hdd_fd);
 
     output_file = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if(output_file == -1)
-    {
+    if (output_file == -1) {
         fprintf(stderr, "dump_rom_image: Could not create %s\n", out_file);
         return -1;
     }
 
     printf("Writing rom image to file\n");
-    if(write(output_file, rom_image_buffer, ROM_IMAGE_BLOCK_SIZE) == -1)
-    {
+    if (write(output_file, rom_image_buffer, ROM_IMAGE_SIZE) == -1) {
         fprintf(stderr, "dump_rom_image: Could not write to %s file\n",
             out_file);
         close(output_file);
@@ -122,6 +113,93 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
 
     close(output_file);
 
+    return 0;
+}
+
+/* !MUST BE VERIFIED! */
+/* Operations: */
+/* Open the hard disk device file */
+/* Check if device is a supported western digital disk*/
+/* Open in_file */
+/* Read in_file to rom buffer memory */
+/* Close in_file*/
+/* Enable vendor specific command */
+/* Get rom access */
+/* Loop and write contents of rom buffer to hard disk drive */
+/* Disable vendor specif commands */
+int upload_rom_image(char *hard_disk_dev_file, char *in_file)
+{
+    uint8_t *rom_image_buffer;
+    int input_file;
+
+    int hdd_fd = open_hard_disk_drive(hard_disk_dev_file);
+    if (hdd_fd == -1) {
+        fprintf(stderr, "upload_rom_image: Could not handle hard disk " \
+            "drive.\n");
+        return -1;
+    }
+
+    printf("Allocating memory for rom image\n");
+    rom_image_buffer = calloc(ROM_IMAGE_SIZE, 1);
+    if (rom_image_buffer == NULL) {
+        perror("calloc:");
+        close(hdd_fd);
+        return -1;
+    }
+
+    input_file = open(in_file, O_RDONLY);
+
+
+    printf("Enabling vendor specific commands\n");
+    if (enable_vendor_specific_commands(hdd_fd) == -1) {
+        fprintf(stderr, "upload_rom_image: Could not enable " \
+            "vendor specific commands.\n");
+        free(rom_image_buffer);
+        close(hdd_fd);
+        return -1;
+    }
+
+    printf("Errasing rom from disk.\n");
+    if (get_rom_acces(hdd_fd, ROM_KEY_ERASE) == -1) {
+        fprintf(stderr, "upload_rom_image: Could not get rom erase access.\n");
+        free(rom_image_buffer);
+        close(hdd_fd);
+        return -1;
+    }
+
+    printf("Getting access to rom.\n");
+    if (get_rom_acces(hdd_fd, ROM_KEY_WRTIE) == -1) {
+        fprintf(stderr, "upload_rom_image: Could not get rom write eaccess.\n");
+        free(rom_image_buffer);
+        close(hdd_fd);
+        return -1;
+    }
+
+    unsigned int i;
+
+    printf("Uploading rom image\n");
+    /* Request the ROM image using 64KiB block requests. */
+    for (i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE) {
+        if (write_rom_block(hdd_fd, &rom_image_buffer[i], ROM_IMAGE_BLOCK_SIZE)
+            == -1) {
+            fprintf(stderr, "upload_rom_image: Could not write rom block: %d\n",
+                (i / ROM_IMAGE_BLOCK_SIZE));
+            free(rom_image_buffer);
+            close(hdd_fd);
+            return -1;
+        }
+    }
+
+    printf("Disabling vendor specific commands\n");
+    if (disable_vendor_specific_commands(hdd_fd) == -1) {
+        fprintf(stderr, "upload_rom_image: Could not disable " \
+            "vendor specific commands.\n");
+        free(rom_image_buffer);
+        close(hdd_fd);
+        return -1;
+    }
+
+    close(hdd_fd);
     return 0;
 }
 

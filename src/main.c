@@ -27,63 +27,51 @@ static inline int check_root_permission(void);
 
 int main(int argc, char *argv[])
 {
-    if(argc < 2)
-    {
+    if (argc < 2) {
         display_options(argv[0]);
         exit(1);
     }
 
     /* Option: Dump */
-    if(strcmp(argv[1], "-d") == 0)
-    {
-        if(argc != 4)
-        {
+    if (strcmp(argv[1], "-d") == 0) {
+        if (argc != 4) {
             display_options(argv[0]);
             exit(1);
         }
 
-        if(check_root_permission() != 0)
-        {
+        if (check_root_permission() != 0) {
             fprintf(stderr, "main: Application should be run as root.\n");
             exit(1);
         }
 
         /* argv[2] = hard disk location */
         /* argv[3] = output file */
-        if(dump_rom_image(argv[2], argv[3]) == -1)
-        {
+        if (dump_rom_image(argv[2], argv[3]) == -1) {
             fprintf(stderr, "main: Could not dump rom image from the disk.\n");
             exit(1);
         }
 
         printf("Finished dumping rom to %s\n", argv[3]);
     }
-    else if(strcmp(argv[1], "-l") == 0)
-    {
+    else if (strcmp(argv[1], "-l") == 0) {
 
     }
-    else if(strcmp(argv[1], "-i") == 0)
-    {
+    else if (strcmp(argv[1], "-i") == 0) {
 
     }
-    else if(strcmp(argv[1], "-p") == 0)
-    {
+    else if (strcmp(argv[1], "-p") == 0) {
 
     }
-    else if(strcmp(argv[1], "-d") == 0)
-    {
+    else if (strcmp(argv[1], "-d") == 0) {
 
     }
-    else if(strcmp(argv[1], "-a") == 0)
-    {
+    else if (strcmp(argv[1], "-a") == 0) {
 
     }
-    else if(strcmp(argv[1], "-s") == 0)
-    {
+    else if (strcmp(argv[1], "-s") == 0) {
 
     }
-    else
-    {
+    else {
         display_options(argv[0]);
         exit(1);
     }
@@ -107,17 +95,14 @@ void display_options(char *app_name)
     printf("Pack image: %s -p <rom file>\n", app_name);
     printf("Add block: %s -p <rom file> <block file>\n", app_name);
     printf("Hard disk scan: %s -s\n", app_name);
-    return;
 }
 
 static inline int check_root_permission(void)
 {
-    if(getuid() == 0)
-    {
+    if (getuid() == 0) {
         return 0;
     }
-    else
-    {
+    else {
         return 1;
     }
 }

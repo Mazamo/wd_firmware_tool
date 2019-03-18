@@ -34,6 +34,7 @@
 
 #define ROM_KEY_READ                    0x01
 #define ROM_KEY_WRTIE                   0x02
+#define ROM_KEY_ERASE                   0x03
 
 /*
  * Some useful ATA register bits (source: http://idle3-tools.sourceforge.net/)
@@ -61,7 +62,7 @@ int enable_vendor_specific_commands(int hard_disk_file_descriptor);
 int disable_vendor_specific_commands(int hard_disk_file_descriptor);
 
 /* Send a packet that enables rom access */
-int get_rom_acces(int hard_disk_file_descriptor);
+int get_rom_acces(int hard_disk_file_descriptor, int read_write);
 
 /* Read a rom block from the hard disk drive */
 int read_rom_block(int hard_disk_file_descriptor, void *block,
