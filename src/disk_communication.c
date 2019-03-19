@@ -5,6 +5,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <getopt.h>
 #include <ctype.h>
 
@@ -50,6 +51,7 @@ int open_hard_disk_drive(char *hard_disk_dev_file)
     if (identify_hard_disk_drive(fd) == -1) {
         fprintf(stderr, "open_hard_disk_drive: Specified hard disk drive is " \
             "not supported\n");
+        close(fd);
         return -1;
     }
 
@@ -71,8 +73,11 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     /* protocol 4: PIO Data-In */
     identify_cdb[1]     = 0x08;
 
-    /* off.line: cc: lh.en: ll.en: sc.en: f.en: */
+    /* off.line:00 cc:1 lh.en:1 lm.en:1 ll.en:1 sc.en:1 f.en:0 */
+    /* cc 1: generate CHECK CONDITION when ATA command completes */
+    /* */
     identify_cdb[2]     = 0x2e;
+
     identify_cdb[3]     = 0x00; /* Features (8:15): */
     identify_cdb[4]     = 0x00; /* Features (0:7): */
     identify_cdb[5]     = 0x00; /* Sector Count (8:15): */
@@ -85,7 +90,9 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     identify_cdb[12]    = 0x00; /* LBA High (0:7): */
     identify_cdb[13]    = 0x40; /* Device: */
     identify_cdb[14]    = ATA_IDENTIFY; /* Command: Identify device */
-    identify_cdb[15]    = 0x00; /* Control: */
+
+    /* Control: auto cotingent allegiance not established */
+    identify_cdb[15]    = 0x00;
 
     uint8_t identify_reply_buffer[512 * 2];
     memset(identify_reply_buffer, 0, sizeof(identify_reply_buffer));

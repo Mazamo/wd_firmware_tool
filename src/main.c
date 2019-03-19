@@ -8,16 +8,16 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <unistd.h>
-
-
+#include <dirent.h>
 
 /* Application specific */
 #include "includes/rom_management.h"
+#include "includes/disk_communication.h"
 
 /* Function prototypes: */
 
  /* Scan for all connected hard disk drive */
-static int scan_hard_disk_drives(void);
+static void scan_hard_disk_drives(void);
 
 /* Display the application's options */
 static void display_options(char *app_name);
@@ -40,21 +40,42 @@ int main(int argc, char *argv[])
         }
 
         if (check_root_permission() != 0) {
-            fprintf(stderr, "main: Application should be run as root.\n");
+            fprintf(stderr, "main: Application should be run as root for " \
+                "this operation.\n");
             exit(1);
         }
 
         /* argv[2] = hard disk location */
         /* argv[3] = output file */
         if (dump_rom_image(argv[2], argv[3]) == -1) {
-            fprintf(stderr, "main: Could not dump rom image from the disk.\n");
+            fprintf(stderr, "main: Could not dump rom image from the hard " \
+                "disk drive.\n");
             exit(1);
         }
 
-        printf("Finished dumping rom to %s\n", argv[3]);
+        printf("Finished dumping rom from %s\n", argv[3]);
     }
     else if (strcmp(argv[1], "-l") == 0) {
+        if (argc != 4) {
+            display_options(argv[0]);
+            exit(1);
+        }
 
+        if (check_root_permission() != 0) {
+            fprintf(stderr, "main: Application should be run as root for " \
+                "this operation.\n");
+            exit(1);
+        }
+
+        /* argv[2] = hard disk location */
+        /* argv[3] = input binary file */
+        if (upload_rom_image(argv[2], argv[3]) == -1) {
+            fprintf(stderr, "main: Could not upload firmware image to the " \
+                " the hard disk disk drive.\n");
+            exit(1);
+        }
+
+        printf("Finished uploading rom image to %s\n", argv[3]);
     }
     else if (strcmp(argv[1], "-i") == 0) {
 
@@ -69,7 +90,13 @@ int main(int argc, char *argv[])
 
     }
     else if (strcmp(argv[1], "-s") == 0) {
+        if (check_root_permission() != 0) {
+            fprintf(stderr, "main: Application should be run as root for " \
+                "this operation.\n");
+            exit(1);
+        }
 
+        scan_hard_disk_drives();
     }
     else {
         display_options(argv[0]);
@@ -79,9 +106,45 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int scan_hard_disk_drives(void)
+void scan_hard_disk_drives(void)
 {
-    return 0;
+    DIR *dev_directory;
+    struct dirent *directory;
+    int fd;
+
+    char dev_prefix[] = "/dev/";
+
+    dev_directory = opendir(dev_prefix);
+    if (dev_directory) {
+        while ((directory = readdir(dev_directory)) != NULL) {
+            if (!(directory->d_type == DT_BLK ||
+                directory->d_type == DT_UNKNOWN)) {
+                continue;
+            }
+
+            /* Used to exclude partitions (example sda1, sda2, ..., sdaN). */
+            if (strlen(directory->d_name) != 3) {
+                continue;
+            }
+
+            if (strncmp("sd", directory->d_name, 2) == 0) {
+                char filename[strlen(dev_prefix) +
+                    strlen(directory->d_name) + 1];
+
+                memcpy(filename, dev_prefix, strlen(dev_prefix));
+                memcpy(filename + strlen(dev_prefix), directory->d_name,
+                    strlen(directory->d_name) + 1);
+
+                printf("%s:\n", filename);
+                fd = open_hard_disk_drive(filename);
+
+                if (fd != -1) {
+                    close(fd);
+                }
+            }
+        }
+        closedir(dev_directory);
+    }
 }
 
 void display_options(char *app_name)

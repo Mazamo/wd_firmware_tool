@@ -116,7 +116,6 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     return 0;
 }
 
-/* !MUST BE VERIFIED! */
 /* Operations: */
 /* Open the hard disk device file */
 /* Check if device is a supported western digital disk*/
@@ -148,7 +147,10 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     }
 
     input_file = open(in_file, O_RDONLY);
-
+    if (input_file < 0) {
+        perror("open");
+        return -1;
+    }
 
     printf("Enabling vendor specific commands\n");
     if (enable_vendor_specific_commands(hdd_fd) == -1) {
