@@ -46,6 +46,13 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
         return -1;
     }
 
+    if (identify_hard_disk_drive(hdd_fd) == -1) {
+        fprintf(stderr, "dump_rom_image: Specified hard disk drive is " \
+            "not supported\n");
+        close(hdd_fd);
+        return -1;
+    }
+
     printf("Allocating memory for rom image\n");
     rom_image_buffer = calloc(ROM_IMAGE_SIZE, 1);
     if (rom_image_buffer == NULL) {
@@ -135,6 +142,13 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     if (hdd_fd == -1) {
         fprintf(stderr, "upload_rom_image: Could not handle hard disk " \
             "drive.\n");
+        return -1;
+    }
+
+    if (identify_hard_disk_drive(hdd_fd) == -1) {
+        fprintf(stderr, "upload_rom_image: Specified hard disk drive is " \
+            "not supported\n");
+        close(hdd_fd);
         return -1;
     }
 

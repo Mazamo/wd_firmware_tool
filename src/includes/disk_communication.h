@@ -2,6 +2,7 @@
 #define DISK_COMMUNICATION_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 /*
  * Used sources:
@@ -14,15 +15,19 @@
 #define ATA_VENDOR_SPECIFIC_COMMAND     0x80
 #define ATA_IDENTIFY                    0xEC
 #define ATA_OP_SMART                    0xb0
+#define ATA_READ_DMA_EXT 				0x25
+#define ATA_WRITE_DMA_EXT 				0x35
 
 #define SG_ATA_16                       0x85
 #define SG_ATA_16_LEN		            16
+
 
 #define IDENTIFY_SERIAL_NUMBER_START    10 * 2
 #define IDENTIFY_SERIAL_NUMBER_END      19 * 2
 
 #define IDENTIFY_FIRMWARE_REVISION_START    23 * 2
 #define IDENTIFY_FIRMWARE_REVISION_END      26 * 2
+#define MAXIMUM_LBA_ENTRY				100 * 2
 
 #define IDENTIFY_MODEL_NUMBER_START     27 * 2
 #define IDENTIFY_MODEL_NUMBER_END       46 * 2
@@ -45,36 +50,45 @@ enum {
 	ATA_STAT_ERR		= (1 << 0),
 };
 
-/* Opens a hard disk drive's device file */
+/* Opens a hard disk drive's device file. */
 int open_hard_disk_drive(char *hard_disk_dev_file);
 
-/* Identifies a hard disk drive by sending an inquiry packet */
+/* Identifies a hard disk drive by sending an inquiry packet. */
 int identify_hard_disk_drive(int hard_disk_file_descriptor);
 
 /* Checks the output of an inquiry packet to determine if the disk is
-   supported */
+   supported. */
 int verify_hard_disk_support(uint8_t *hard_disk_response);
 
-/* Send a packet that enables vendor specific command capabilities */
+/* Send a packet that enables vendor specific command capabilities. */
 int enable_vendor_specific_commands(int hard_disk_file_descriptor);
 
-/* Send a packet that disables vendor specifc command capabilities */
+/* Send a packet that disables vendor specifc command capabilities. */
 int disable_vendor_specific_commands(int hard_disk_file_descriptor);
 
 /* Send a packet that enables rom access */
 int get_rom_acces(int hard_disk_file_descriptor, int read_write);
 
-/* Read a rom block from the hard disk drive */
+/* Read a rom block from the hard disk drive. */
 int read_rom_block(int hard_disk_file_descriptor, void *block,
-    unsigned int size);
+    size_t size);
 
-/* Write a rom block to the hard disk drive */
+/* Write a rom block to the hard disk drive. */
 int write_rom_block(int hard_disk_file_descriptor, void *block,
-    unsigned int size);
+    size_t size);
+
+/* Perform a ATA read dma ext command and return the result in data_buffer. */
+int read_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
+	uint8_t * data_buffer, size_t size);
+
+/* Perform a ATA write dma ext command to write data_buffer to lba_id
+   on the disk specified by hard_disk_file_descriptor. */
+int write_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
+	uint8_t * data_buffer, size_t size);
 
 /* Execute Linux SCSI command */
 int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
-    void *response_buffer, unsigned int response_buffer_size,
+    void *response_buffer, size_t response_buffer_size,
     int data_direction);
 
 #endif

@@ -29,6 +29,9 @@ static void display_firmware_revision(uint8_t *hard_disk_response);
 /* Display the serial number of the detected hard disk drive. */
 static void display_serial_number(uint8_t *hard_disk_response);
 
+/* Display the maximum LBA range entry number. */
+static void display_number_of_lba_entries(uint8_t *hard_disk_response);
+
 /* Display the sense buffer after an IOCTL fuction has been invoked. */
 static inline void display_sense_buffer(unsigned char sense_buffer[32]);
 
@@ -38,7 +41,8 @@ static inline int calculate_pack_id(unsigned char *cdb);
 int open_hard_disk_drive(char *hard_disk_dev_file)
 {
     if (strncmp(hard_disk_dev_file, "/dev/s", sizeof("/dev/s") - 1) != 0) {
-        fprintf(stderr, "open_hard_disk_drive: Invalid device file.\n");
+        fprintf(stderr, "open_hard_disk_drive: Invalid device file: %s.\n",
+            hard_disk_dev_file);
         return -1;
     }
 
@@ -48,12 +52,14 @@ int open_hard_disk_drive(char *hard_disk_dev_file)
         return -1;
     }
 
+/*
     if (identify_hard_disk_drive(fd) == -1) {
         fprintf(stderr, "open_hard_disk_drive: Specified hard disk drive is " \
             "not supported\n");
         close(fd);
         return -1;
     }
+*/
 
     return fd;
 }
@@ -107,6 +113,7 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     display_model(identify_reply_buffer);
     display_firmware_revision(identify_reply_buffer);
     display_serial_number(identify_reply_buffer);
+    display_number_of_lba_entries(identify_reply_buffer);
 
     return verify_hard_disk_support((uint8_t *) identify_reply_buffer);
 }
@@ -165,7 +172,14 @@ static void display_serial_number(uint8_t *hard_disk_response)
             putchar(hard_disk_response[i]);
         }
     }
+
     printf("\n");
+}
+
+static void display_number_of_lba_entries(uint8_t *hard_disk_response)
+{
+    printf("Maximum number of 512-byte blocks of LBA Range Entries: ");
+    printf("0x%lx\n", *(uint64_t *) (hard_disk_response + (MAXIMUM_LBA_ENTRY)));
 }
 
 int verify_hard_disk_support(uint8_t *hard_disk_response)
@@ -303,7 +317,7 @@ int get_rom_acces(int hard_disk_file_descriptor, int read_write)
 }
 
 int read_rom_block(int hard_disk_file_descriptor, void *block,
-    unsigned int size)
+    size_t size)
 {
     unsigned char read_rom_block_cdb[SG_ATA_16_LEN];
 
@@ -340,7 +354,7 @@ int read_rom_block(int hard_disk_file_descriptor, void *block,
 }
 
 int write_rom_block(int hard_disk_file_descriptor, void *block,
-    unsigned int size)
+    size_t size)
 {
     unsigned char write_rom_block_cdb[SG_ATA_16_LEN];
 
@@ -376,6 +390,84 @@ int write_rom_block(int hard_disk_file_descriptor, void *block,
     return 0;
 }
 
+int read_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
+	uint8_t * data_buffer, size_t size)
+{
+    unsigned char read_dma_block_cdb[SG_ATA_16_LEN];
+
+    read_dma_block_cdb[0]     = SG_ATA_16; /* operation code: SG_ATA_16 */
+
+    /* multiple count: 0 protocol: 4 extended: 0  */
+    /* protocol D: DMA Data-In */
+    read_dma_block_cdb[1]     = 0x0D;
+
+    /* off.line: cc: lh.en: ll.en: sc.en: f.en: */
+    read_dma_block_cdb[2]     = 0x2e;
+    read_dma_block_cdb[3]     = 0x00; /* Features (8:15): */
+    read_dma_block_cdb[4]     = 0x00; /* Features (0:7): */
+    read_dma_block_cdb[5]     = 0x00; /* Sector Count (8:15): */
+    read_dma_block_cdb[6]     = 0x01; /* Sector Count (0:7): */
+    read_dma_block_cdb[7]     = lba_id >> 8; /* LBA Low (8:15): */
+    read_dma_block_cdb[8]     = lba_id; /* LBA Low (0:7): */
+    read_dma_block_cdb[9]     = lba_id >> 24; /* LBA Mid (8:15): */
+    read_dma_block_cdb[10]    = lba_id >> 16; /* LBA Mid (0:7): */
+    read_dma_block_cdb[11]    = 0x00; /* LBA High (8:15): */
+    read_dma_block_cdb[12]    = 0x00; /* LBA High (0:7): */
+    read_dma_block_cdb[13]    = 0x40; /* Device: */
+
+    /* Command: smart ata operation */
+    read_dma_block_cdb[14]    = ATA_READ_DMA_EXT;
+    read_dma_block_cdb[15]    = 0x00; /* Control: */
+
+    if (execute_command(read_dma_block_cdb, hard_disk_file_descriptor,
+        data_buffer, size, SG_DXFER_FROM_DEV) == -1) {
+        fprintf(stderr, "read_dma_ext: Could not send read dma ext " \
+            "command to hard disk drive.\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int write_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
+	uint8_t * data_buffer, size_t size)
+{
+    unsigned char write_dma_block_cdb[SG_ATA_16_LEN];
+
+    write_dma_block_cdb[0]     = SG_ATA_16; /* operation code: SG_ATA_16 */
+
+    /* multiple count: 0 protocol: 4 extended: 0  */
+    /* protocol D: DMA Data-In */
+    write_dma_block_cdb[1]     = 0x0D;
+
+    /* off.line: cc: lh.en: ll.en: sc.en: f.en: */
+    write_dma_block_cdb[2]     = 0x26;
+    write_dma_block_cdb[3]     = 0x00; /* Features (8:15): */
+    write_dma_block_cdb[4]     = 0x00; /* Features (0:7): */
+    write_dma_block_cdb[5]     = 0x00; /* Sector Count (8:15): */
+    write_dma_block_cdb[6]     = 0x01; /* Sector Count (0:7): */
+    write_dma_block_cdb[7]     = lba_id >> 8; /* LBA Low (8:15): */
+    write_dma_block_cdb[8]     = lba_id; /* LBA Low (0:7): */
+    write_dma_block_cdb[9]     = lba_id >> 24; /* LBA Mid (8:15): */
+    write_dma_block_cdb[10]    = lba_id >> 16; /* LBA Mid (0:7): */
+    write_dma_block_cdb[11]    = 0x00; /* LBA High (8:15): */
+    write_dma_block_cdb[12]    = 0x00; /* LBA High (0:7): */
+    write_dma_block_cdb[13]    = 0x40; /* Device: */
+
+    /* Command: smart ata operation */
+    write_dma_block_cdb[14]    = ATA_WRITE_DMA_EXT;
+    write_dma_block_cdb[15]    = 0x00; /* Control: */
+
+    if (execute_command(write_dma_block_cdb, hard_disk_file_descriptor,
+        data_buffer, size, SG_DXFER_TO_DEV) == -1) {
+        fprintf(stderr, "write_dma_ext: Could not send write dma ext " \
+            "command to hard disk drive.\n");
+        return -1;
+    }
+
+    return 0;
+}
+
 static inline int calculate_pack_id(unsigned char *cdb)
 {
     uint32_t lba24;
@@ -397,7 +489,7 @@ static inline void display_sense_buffer(unsigned char sense_buffer[32])
 }
 
 int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
-    void *response_buffer, unsigned int response_buffer_size,
+    void *response_buffer, size_t response_buffer_size,
     int data_direction)
 {
     sg_io_hdr_t io_hdr;
