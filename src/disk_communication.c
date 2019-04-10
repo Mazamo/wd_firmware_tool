@@ -83,7 +83,6 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     /* cc 1: generate CHECK CONDITION when ATA command completes */
     /* */
     identify_cdb[2]     = 0x2e;
-
     identify_cdb[3]     = 0x00; /* Features (8:15): */
     identify_cdb[4]     = 0x00; /* Features (0:7): */
     identify_cdb[5]     = 0x00; /* Sector Count (8:15): */
@@ -527,14 +526,17 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     }
 
     /*
-    * This is not necessarly a failure and thus returns another warning message.
+    * This is not necessarly a failure and thus returns another warning message
+    * for now.
     */
+    /*
     if (sense_buffer[0] != 0x72 || sense_buffer[7] < 14 ||
         sense_buffer[8] != 0x09 || sense_buffer[9] < 0x0c) {
         fprintf(stderr, "execute_command: Detected error in sense buffer\n");
         display_sense_buffer(sense_buffer);
         return -2;
     }
+    */
 
     if (sense_buffer[21] & (ATA_STAT_ERR | ATA_STAT_DRQ)) {
         fprintf(stderr, "execute_command: Detected I/O error\n");

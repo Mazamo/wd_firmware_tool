@@ -83,6 +83,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     printf("Dumping rom\n");
     /* Request the ROM image using 64KiB block requests. */
     for (i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE) {
+        printf("Reading ROM block from offset: %d\n", i);
         if (read_rom_block(hdd_fd, &rom_image_buffer[i], ROM_IMAGE_BLOCK_SIZE)
             == -1) {
             fprintf(stderr, "dump_rom_image: Could not read rom block: %d\n",
@@ -196,6 +197,7 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     printf("Uploading rom image\n");
     /* Request the ROM image using 64KiB block requests. */
     for (i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE) {
+        printf("Writing ROM block to offset: %d\n", i);
         if (write_rom_block(hdd_fd, &rom_image_buffer[i], ROM_IMAGE_BLOCK_SIZE)
             == -1) {
             fprintf(stderr, "upload_rom_image: Could not write rom block: %d\n",
@@ -219,8 +221,17 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     return 0;
 }
 
+/* Operations: */
+/* Open rom_image */
+/* Map contents rom_image to file */
+/* Close rom_image */
+/* Create array of rom header structures */
+/* Display array of rom header structures */
+/* Perform unpacking algorithm */
+/* */
 int unpack_rom_image(char *rom_image)
 {
+
     return 0;
 }
 
