@@ -429,6 +429,7 @@ int read_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
     return 0;
 }
 
+/* Does not work as expected. Needs fixing. */
 int write_dma_ext(int hard_disk_file_descriptor, unsigned long lba_id,
 	uint8_t * data_buffer, size_t size)
 {
