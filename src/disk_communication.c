@@ -287,9 +287,11 @@ int get_rom_acces(int hard_disk_file_descriptor, int read_write)
     get_rom_access_cdb[3]     = 0x00; /* Features (8:15): */
     get_rom_access_cdb[4]     = 0xd6; /* Features (0:7): */
     get_rom_access_cdb[5]     = 0x00; /* Sector Count (8:15): */
-    get_rom_access_cdb[6]     = 0x80; /* Sector Count (0:7): */
+    //get_rom_access_cdb[6]     = 0x80; /* Sector Count (0:7): */
+    get_rom_access_cdb[6]     = 0x01; /* Sector Count (0:7): */
     get_rom_access_cdb[7]     = 0x00; /* LBA Low (8:15): */
-    get_rom_access_cdb[8]     = 0xbf; /* LBA Low (0:7): */
+    //get_rom_access_cdb[8]     = 0xbf; /* LBA Low (0:7): */
+    get_rom_access_cdb[8]     = 0xbe; /* LBA Low (0:7): */
     get_rom_access_cdb[9]     = 0x00; /* LBA Mid (8:15): */
     get_rom_access_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
     get_rom_access_cdb[11]    = 0x00; /* LBA High (8:15): */
