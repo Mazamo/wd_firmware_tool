@@ -27,7 +27,7 @@ static inline uint32_t le_32_to_be(uint32_t integer);
 /* Native endian to little-endian */
 static uint32_t be_32_to_le(uint32_t integer);
 
-/* Calculates the checksum of a code block in the rom file. */
+/* Calculates the checksum (8 or 16 bit) of a code block in the rom file. */
 static unsigned int calculate_rom_block_checksum_8(uint8_t *block,
     unsigned int size);
 static unsigned int calculate_rom_block_checksum_16(uint8_t *block,
@@ -44,7 +44,7 @@ static inline void unmmap_rom_file(uint8_t *rom_file, unsigned int rom_size);
 
 /* Create rom block table. */
 static rom_block *create_rom_block_table(uint8_t *rom_file,
-    unsigned int number_of_blocks);
+    unsigned int *number_of_blocks);
 
 /* Destrom rom block table. */
 static inline void destroy_rom_block_table(rom_block *rom_block_table);
@@ -57,6 +57,15 @@ static int verify_rom_block_header(rom_block *block);
 
 /* Verify the integrity of a rom block contents. */
 static int verify_rom_block_contents(uint8_t *rom, rom_block *rom_block);
+
+/* Serialise rom block header array */
+static int serialise_rom_block_header(char *rom_file,
+    rom_block *rom_block_header);
+
+/* Extract the rom blocks from a rom file. This is usefull for making
+ * adjustments to the rom image. */
+static int extract_rom_blocks(rom_block *rom_block_header, uint8_t *rom,
+    char *file_path);
 
 /* Operations: */
 /* Open the hard disk device file */
@@ -254,8 +263,41 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     return 0;
 }
 
-int unpack_rom_image(char *rom_image)
+/* Operations: */
+/* Map contents of rom_image to memory */
+/* Create array of rom header structures */
+/* Serialise rom header array to output file */
+/* Use rom header array to extract and save rom blocks to the disk */
+/* Destroy array of rom header structures */
+int unpack_rom_image(char *rom_image, char *out_file)
 {
+    uint8_t *rom_memory;
+    rom_block *rom_header_table;
+    int file_size;
+    unsigned int number_of_headers = 0;
+    int output_file ;
+
+    if ((rom_memory = memory_map_rom_file(rom_image, &file_size)) == NULL) {
+        fprintf(stderr, "unpack_rom_image: Could not load rom " \
+            "image: %s\n", rom_image);
+        return -1;
+    }
+
+    if ((rom_header_table =
+        create_rom_block_table(rom_memory, &number_of_headers)) == NULL) {
+        fprintf(stderr, "unpack_rom_image: Could not create rom header " \
+            "table.\n");
+        unmmap_rom_file(rom_memory, file_size);
+        return -1;
+    }
+
+    output_file = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    if (output_file == -1) {
+        fprintf(stderr, "unpack_rom_image: Could not create %s\n", out_file);
+        return -1;
+    }
+
+
 
     return 0;
 }
@@ -268,6 +310,18 @@ int pack_rom_image(char *rom_image, char *out_file)
 int add_rom_block(char *rom_file, char *block_file)
 {
     return 0;
+}
+
+static int serialise_rom_block_header(char *rom_file,
+    rom_block *rom_block_header)
+{
+
+}
+
+static int extract_rom_blocks(rom_block *rom_block_header, uint8_t *rom,
+    char *file_path)
+{
+
 }
 
 /* Operations: */
@@ -316,6 +370,8 @@ int display_rom_info(char *rom_image)
     uint8_t *rom_memory;
     rom_block *rom_header_table;
     int file_size;
+    unsigned int number_of_headers = 0;
+
     if ((rom_memory = memory_map_rom_file(rom_image, &file_size)) == NULL) {
         fprintf(stderr, "display_rom_info: Could not load rom " \
             "image: %s\n", rom_image);
@@ -323,7 +379,7 @@ int display_rom_info(char *rom_image)
     }
 
     if ((rom_header_table =
-        create_rom_block_table(rom_memory, NUMBER_OF_HEADERS)) == NULL) {
+        create_rom_block_table(rom_memory, &number_of_headers)) == NULL) {
         fprintf(stderr, "display_rom_info: Could not create rom header " \
             "table.\n");
         unmmap_rom_file(rom_memory, file_size);
@@ -331,15 +387,16 @@ int display_rom_info(char *rom_image)
     }
 
     int i;
-    for (i = 0; i < NUMBER_OF_HEADERS; ++i) {
+    for (i = 0; i < number_of_headers; ++i) {
         display_rom_block(&rom_header_table[i]);
 
         verify_rom_block_header(&rom_header_table[i]);
         verify_rom_block_contents(rom_memory, &rom_header_table[i]);
-        if (i != NUMBER_OF_HEADERS - 1) {
-            printf("\n");
-        }
+        printf("\n");
     }
+
+    printf("End of the rom block header: %#lx\n",
+        (number_of_headers * sizeof(rom_block)));
 
     destroy_rom_block_table(rom_header_table);
 
@@ -372,8 +429,8 @@ static void display_rom_block(rom_block *block)
     printf("Block encrypted:            %s\n",
         (block->flag == FLAG_UNENCRYPTED) ? "no" : "yes");
 
+    printf("Unkown 1:                   %#x\n", block->unk1);
     printf("Unkown 2:                   %#x\n", block->unk2);
-    printf("Unkown 3:                   %#x\n", block->unk3);
     printf("Block length plus checksum: %#x\n",
         le_32_to_be(block->length_plus_cs));
     printf("Block size:                 %#x\n", le_32_to_be(block->size));
@@ -383,7 +440,7 @@ static void display_rom_block(rom_block *block)
         le_32_to_be(block->load_address));
     printf("Block execution address:    %#x\n",
         le_32_to_be(block->execution_address));
-    printf("Unkown 4:                   %#x\n", block->unk4);
+    printf("Unkown 3:                   %#x\n", block->unk3);
     printf("Block checksum:             %#x\n", block->fstw_plus_cs);
 }
 
@@ -448,13 +505,22 @@ static unsigned int calculate_line_checksum(uint8_t *block)
 }
 
 static rom_block *create_rom_block_table(uint8_t *rom_file,
-    unsigned int number_of_blocks)
+    unsigned int *number_of_blocks)
 {
-    unsigned int table_size = sizeof(rom_block) * number_of_blocks;
+    unsigned int table_size;
+    int i = 0;
+
+    while (((rom_block *) rom_file)[i].block_nr <= 0x0a ||
+        ((rom_block *) rom_file)[i].block_nr== 0x5a) {
+        ++i;
+    }
+    *number_of_blocks = i;
+
+    table_size = sizeof(rom_block) * *number_of_blocks;
     rom_block *rom_block_table = (rom_block *) malloc(table_size);
 
     if (rom_block_table == NULL) {
-        perror("malloc");
+        perror("create_rom_block_table: malloc");
         return NULL;
     }
 

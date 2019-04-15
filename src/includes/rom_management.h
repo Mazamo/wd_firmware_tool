@@ -19,9 +19,9 @@
  */
 typedef struct __attribute__((packed)) {
 	uint8_t block_nr; /* Number of the block in the table of block structures */
-	uint8_t flag; /* 1=compressed, 2=not compressed, 3=compressed differently */
+	uint8_t flag;
+	uint8_t unk1; /* ? */
 	uint8_t unk2; /* ? */
-	uint8_t unk3; /* ? */
 	uint32_t length_plus_cs; /* Length of the block plus the checksum*/
 	uint32_t size; /* Length of the rom block*/
 	uint32_t start_address; /* Start of the block address */
@@ -29,7 +29,7 @@ typedef struct __attribute__((packed)) {
 	/* Physical addr where decompresed blocks have to be stored */
 	uint32_t load_address;
 	uint32_t execution_address; /* Execution address */
-	uint32_t unk4; /* ? */
+	uint32_t unk3; /* ? */
 	uint32_t fstw_plus_cs; /* Checksum of the block */
 } rom_block;
 
@@ -40,7 +40,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file);
 int upload_rom_image(char *hard_disk_dev_file, char *in_file);
 
 /* Unpacks a packed rom image. */
-int unpack_rom_image(char *rom_image);
+int unpack_rom_image(char *rom_image, char *out_file);
 
 /* Packs a rom image. */
 int pack_rom_image(char *rom_image, char *out_file);

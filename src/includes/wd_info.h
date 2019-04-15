@@ -10,10 +10,4 @@
  */
 #define ROMTYPE_SPI 0x03
 
-char *supported_hard_disk_drives[] =
-    {
-        "wd800jd",
-        "wd1600aajs",
-    };
-
 #endif

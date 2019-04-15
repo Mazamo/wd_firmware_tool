@@ -496,10 +496,10 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     int data_direction)
 {
     sg_io_hdr_t io_hdr;
-    unsigned char sense_buffer[32];
+    unsigned char sense_buffer[32] = {0};
+    //memset(&sense_buffer, 0, sizeof(sense_buffer));
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
-    memset(&sense_buffer, 0, sizeof(sense_buffer));
 
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = SG_ATA_16_LEN;
