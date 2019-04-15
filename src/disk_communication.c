@@ -52,6 +52,7 @@ int open_hard_disk_drive(char *hard_disk_dev_file)
         return -1;
     }
 
+/* Is not the responsibility of this function. */
 /*
     if (identify_hard_disk_drive(fd) == -1) {
         fprintf(stderr, "open_hard_disk_drive: Specified hard disk drive is " \
@@ -138,8 +139,8 @@ static void display_model(uint8_t *hard_disk_response)
 static void display_firmware_revision(uint8_t *hard_disk_response)
 {
     printf("Firmeware revision: ");
-    int i;
 
+    int i;
     for (i = IDENTIFY_FIRMWARE_REVISION_START ;
         i < IDENTIFY_FIRMWARE_REVISION_END; ++i) {
         if (hard_disk_response[i] == 0) {
@@ -528,17 +529,16 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     }
 
     /*
-    * This is not necessarly a failure and thus returns another warning message
+    * This is not necessarly a failure and thus returns another warning result
     * for now.
     */
-    /*
     if (sense_buffer[0] != 0x72 || sense_buffer[7] < 14 ||
         sense_buffer[8] != 0x09 || sense_buffer[9] < 0x0c) {
-        fprintf(stderr, "execute_command: Detected error in sense buffer\n");
+        fprintf(stderr, "execute_command: WARNING: Detected error in " \
+            "sense buffer\n");
         display_sense_buffer(sense_buffer);
         return -2;
     }
-    */
 
     if (sense_buffer[21] & (ATA_STAT_ERR | ATA_STAT_DRQ)) {
         fprintf(stderr, "execute_command: Detected I/O error\n");

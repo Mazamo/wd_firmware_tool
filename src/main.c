@@ -61,7 +61,16 @@ int main(int argc, char *argv[])
     } else if (strcmp(argv[1], "-l") == 0) {
 
     } else if (strcmp(argv[1], "-i") == 0) {
+		if (argc != 3) {
+			display_options(argv[0]);
+			exit(1);
+		}
 
+		if (display_rom_info(argv[2]) != 0) {
+			fprintf(stderr, "main: Could not display information about the " \
+				"provided binary file.\n");
+			exit(1);
+		}
     } else if (strcmp(argv[1], "-p") == 0) {
 
     } else if (strcmp(argv[1], "-a") == 0) {
