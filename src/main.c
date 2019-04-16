@@ -75,6 +75,18 @@ int main(int argc, char *argv[])
 
     } else if (strcmp(argv[1], "-a") == 0) {
 
+	} else if (strcmp(argv[1], "-u") == 0) {
+		if (argc != 3) {
+			display_options(argv[0]);
+			exit(1);
+		}
+
+		printf("Unpacking rom image\n");
+		if (unpack_rom_image(argv[2]) != 0) {
+			fprintf(stderr, "main: Could not unpack rom image\n");
+			exit(1);
+		}printf("Finished extracting %s rom image\n", argv[2]);
+
     } else if (strcmp(argv[1], "-s") == 0) {
         if (getuid() != 0) {
             fprintf(stderr, "main: Application should be run as root for " \
@@ -268,7 +280,8 @@ void display_options(char *app_name)
         app_name);
     printf("Print info blocks: %s -i <rom file>\n", app_name);
     printf("Load ROM image: %s -l <hard disk location> <rom file>\n",
-        app_name);
+		app_name);
+	printf("Unpack rom image: %s -u <rom file>\n", app_name);
     printf("Pack image: %s -p <rom file>\n", app_name);
     printf("Add block: %s -a <rom file> <block file>\n", app_name);
     printf("Hard disk scan: %s -s\n", app_name);

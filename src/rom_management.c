@@ -13,6 +13,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <linux/types.h>
 #include <scsi/sg.h>
 #include <scsi/scsi_ioctl.h>
@@ -58,14 +59,25 @@ static int verify_rom_block_header(rom_block *block);
 /* Verify the integrity of a rom block contents. */
 static int verify_rom_block_contents(uint8_t *rom, rom_block *rom_block);
 
-/* Serialise rom block header array */
-static int serialise_rom_block_header(char *rom_file,
-    rom_block *rom_block_header);
+/* Serialise rom block header array. */
+static int serialise_formatted_rom_block_header(char *rom_header_output_file,
+    rom_block *rom_block, unsigned int number_of_blocks);
 
-/* Extract the rom blocks from a rom file. This is usefull for making
- * adjustments to the rom image. */
-static int extract_rom_blocks(rom_block *rom_block_header, uint8_t *rom,
-    char *file_path);
+/* Serialise a raw chunk of data to an output file. */
+static int serialise_raw_data(char *output_file_name, uint8_t *data,
+    unsigned int size_in_bytes);
+
+/* Initialise a rom_block array based on a provided table_file. */
+static rom_block *create_rom_block_table_from_file(char *table_file,
+    unsigned int *number_of_blocks);
+
+/* Load a single block of rom from a provided rom_file.
+*  Note the whole file is read so the rom_file should only contain rom block
+*  content. */
+static uint8_t *load_rom_block_from_file(char *rom_file);
+
+/* Create and verify a rom image based on an init_file. */
+static uint8_t *create_rom_image_from_file(char *init_file);
 
 /* Operations: */
 /* Open the hard disk device file */
@@ -266,39 +278,168 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
 /* Operations: */
 /* Map contents of rom_image to memory */
 /* Create array of rom header structures */
+/* Create a directory to store extracted data */
+/* Store a copy of the rom file in the created directory*/
+/* Create a human readble header file that is used for making rom adjustments */
 /* Serialise rom header array to output file */
 /* Use rom header array to extract and save rom blocks to the disk */
 /* Destroy array of rom header structures */
-int unpack_rom_image(char *rom_image, char *out_file)
+/* Free contents of rom_image from memory */
+int unpack_rom_image(char *rom_image)
 {
     uint8_t *rom_memory;
     rom_block *rom_header_table;
     int file_size;
-    unsigned int number_of_headers = 0;
-    int output_file ;
+    unsigned int number_of_blocks = 0;
+    struct stat st = {0};
+    char rom_block_file_name[] = "block_xx"; /* Placeholder name */
+    char *string_parse_temp;
+    char temp_string[255] = {0};
+    char copy_file_name[255] = {0};
+    char *rom_image_dir;
+    uint8_t *temp_rom_block;
 
+    memcpy(temp_string, rom_image, strlen(rom_image));
+
+    /* Define a name for the upper directory by using the name of the rom
+    *  file whilst ommiting the file type specifier. */
+    if ((string_parse_temp = strrchr(temp_string, '/')) != NULL) {
+        if (strlen(string_parse_temp) >= 255) {
+            fprintf(stderr, "unpack_rom_image: File name of %s is to long\n",
+                string_parse_temp);
+            return -1;
+        }
+        strncpy(copy_file_name, string_parse_temp + 1,
+            strlen(string_parse_temp));
+
+        rom_image_dir = strtok(string_parse_temp + 1, ".");
+    } else {
+        rom_image_dir = strtok(temp_string, ".");
+    }
+
+    printf("Mapping %s to memory\n", rom_image);
     if ((rom_memory = memory_map_rom_file(rom_image, &file_size)) == NULL) {
         fprintf(stderr, "unpack_rom_image: Could not load rom " \
             "image: %s\n", rom_image);
         return -1;
     }
 
+    printf("Identifying the rom block header table\n");
     if ((rom_header_table =
-        create_rom_block_table(rom_memory, &number_of_headers)) == NULL) {
+        create_rom_block_table(rom_memory, &number_of_blocks)) == NULL) {
         fprintf(stderr, "unpack_rom_image: Could not create rom header " \
             "table.\n");
         unmmap_rom_file(rom_memory, file_size);
         return -1;
     }
 
-    output_file = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if (output_file == -1) {
-        fprintf(stderr, "unpack_rom_image: Could not create %s\n", out_file);
+    if (stat(rom_image_dir, &st) == -1) {
+        if (mkdir(rom_image_dir, 0700) == -1) {
+            perror("unpack_rom_image: mkdir");
+
+            unmmap_rom_file(rom_memory, file_size);
+            destroy_rom_block_table(rom_header_table);
+            return -1;
+        }
+    }
+
+    /* Used to remove the requirement of specifying rom_image_dir before each
+     * file that is created after this call. */
+    if (chdir(rom_image_dir) == -1) {
+        perror("unpack_rom_image: chdir");
+        unmmap_rom_file(rom_memory, file_size);
+        destroy_rom_block_table(rom_header_table);
         return -1;
     }
 
+    printf("Making copy of %s\n", rom_image);
+    if (serialise_raw_data(copy_file_name, rom_memory, file_size) == -1) {
+        fprintf(stderr, "unpack_rom_image: Could not make a copy of %s\n",
+            rom_image);
+        unmmap_rom_file(rom_memory, file_size);
+        destroy_rom_block_table(rom_header_table);
+        return -1;
+    }
 
+    printf("Writing rom block header to disk.\n");
+    if (serialise_formatted_rom_block_header("formated block header",
+        rom_header_table, number_of_blocks) == -1) {
+        fprintf(stderr, "unpack_rom_image: Could not serialise formatted rom " \
+            "block header.\n");
+        unmmap_rom_file(rom_memory, file_size);
+        destroy_rom_block_table(rom_header_table);
+        return -1;
+    }
 
+    if (serialise_raw_data("block header", rom_memory,
+        number_of_blocks * sizeof(rom_block)) == -1) {
+        fprintf(stderr, "unpack_rom_image: Could not serialise rom block " \
+            "header.\n");
+        unmmap_rom_file(rom_memory, file_size);
+        destroy_rom_block_table(rom_header_table);
+        return -1;
+    }
+
+    printf("Extracting and writing rom blocks to disk.\n");
+    int i;
+    for (i = 0; i < number_of_blocks; ++i) {
+        snprintf(rom_block_file_name + 6, 3, "%x",
+            rom_header_table[i].block_nr);
+
+        printf("Extracting rom block %#x from %s\n",
+            rom_header_table[i].block_nr, rom_image);
+
+        temp_rom_block = (uint8_t *) malloc(rom_header_table[i].size);
+        memcpy(temp_rom_block, rom_memory + rom_header_table[i].start_address,
+            rom_header_table[i].size);
+
+        printf("Writing %s to disk.\n", rom_block_file_name);
+        if ((serialise_raw_data(rom_block_file_name,
+            temp_rom_block, rom_header_table[i].size)) == -1) {
+            fprintf(stderr, "unpack_rom_image: Could not serialise rom " \
+                "block %#x\n", rom_header_table[i].block_nr);
+            free(temp_rom_block);
+            unmmap_rom_file(rom_memory, file_size);
+            destroy_rom_block_table(rom_header_table);
+            return -1;
+        }
+
+        free(temp_rom_block);
+        //rom_block = NULL;
+    }
+
+    unmmap_rom_file(rom_memory, file_size);
+    destroy_rom_block_table(rom_header_table);
+
+    return 0;
+}
+
+/* Should this be a ini like file or just a text version of the -i option? */
+static int serialise_formatted_rom_block_header(char *rom_header_output_file,
+    rom_block *rom_block, unsigned int number_of_blocks)
+{
+    return 0;
+}
+
+static int serialise_raw_data(char *output_file_name, uint8_t *data,
+    unsigned int size_in_bytes)
+{
+    int output_file = open(output_file_name, O_CREAT | O_WRONLY |
+        O_TRUNC, 0666);
+    if (output_file == -1) {
+        fprintf(stderr, "serialise_raw_data: Could not create %s.\n",
+            output_file_name);
+        return -1;
+    }
+
+    if(write(output_file, data, size_in_bytes) == -1) {
+        fprintf(stderr, "serialise_raw_data: Could not write to " \
+            "%s file\n", output_file_name);
+        close(output_file);
+        return -1;
+    }
+
+    close(output_file);
     return 0;
 }
 
@@ -312,16 +453,20 @@ int add_rom_block(char *rom_file, char *block_file)
     return 0;
 }
 
-static int serialise_rom_block_header(char *rom_file,
-    rom_block *rom_block_header)
+static rom_block *create_rom_block_table_from_file(char *table_file,
+    unsigned int *number_of_blocks)
 {
-
+    return NULL;
 }
 
-static int extract_rom_blocks(rom_block *rom_block_header, uint8_t *rom,
-    char *file_path)
+static uint8_t *load_rom_block_from_file(char *rom_file)
 {
+    return NULL;
+}
 
+static uint8_t *create_rom_image_from_file(char *init_file)
+{
+    return NULL;
 }
 
 /* Operations: */
@@ -399,6 +544,7 @@ int display_rom_info(char *rom_image)
         (number_of_headers * sizeof(rom_block)));
 
     destroy_rom_block_table(rom_header_table);
+    unmmap_rom_file(rom_memory, file_size);
 
     return 0;
 }
@@ -451,7 +597,7 @@ static int verify_rom_block_header(rom_block *block)
     if (checksum != ((uint8_t *) block)[31]) {
         printf("Rom block checksum FAIL: %#x != %#x\n",
             checksum, ((uint8_t *) block)[31]);
-        return 1;
+        return -1;
     } else {
         printf("Rom block header checksum OK:   %#x\n", checksum);
         return 0;

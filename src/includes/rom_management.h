@@ -40,7 +40,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file);
 int upload_rom_image(char *hard_disk_dev_file, char *in_file);
 
 /* Unpacks a packed rom image. */
-int unpack_rom_image(char *rom_image, char *out_file);
+int unpack_rom_image(char *rom_image);
 
 /* Packs a rom image. */
 int pack_rom_image(char *rom_image, char *out_file);
