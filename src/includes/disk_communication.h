@@ -6,8 +6,7 @@
 
 /*
  * Used sources:
- * - http://www.t13.org/Documents/
-        UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf
+ * - http://www.t13.org/Documents/UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf
  * - https://wiki.osdev.org/ATA_Command_Matrix
  *
  * For vendor specific commands reverse WD firmware tool.

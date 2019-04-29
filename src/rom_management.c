@@ -61,11 +61,14 @@ static int verify_rom_block_contents(uint8_t *rom, rom_block *rom_block);
 
 /* Serialise rom block header array. */
 static int serialise_formatted_rom_block_header(char *rom_header_output_file,
-    rom_block *rom_block, unsigned int number_of_blocks);
+    rom_block *rom_block_table, unsigned int number_of_blocks);
 
 /* Serialise a raw chunk of data to an output file. */
 static int serialise_raw_data(char *output_file_name, uint8_t *data,
     unsigned int size_in_bytes);
+
+/* Output information of a specified rom_block to a provided file descriptor. */
+static int output_rom_block_to_fd(rom_block *block, FILE *fd);
 
 /* Initialise a rom_block array based on a provided table_file. */
 static rom_block *create_rom_block_table_from_file(char *table_file,
@@ -275,6 +278,8 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     return 0;
 }
 
+
+/*TODO: Split into seperate functions and add header serialisation logic */
 /* Operations: */
 /* Map contents of rom_image to memory */
 /* Create array of rom header structures */
@@ -334,7 +339,7 @@ int unpack_rom_image(char *rom_image)
     }
 
     if (stat(rom_image_dir, &st) == -1) {
-        if (mkdir(rom_image_dir, 0700) == -1) {
+        if (mkdir(rom_image_dir, 0777) == -1) {
             perror("unpack_rom_image: mkdir");
 
             unmmap_rom_file(rom_memory, file_size);
@@ -371,7 +376,11 @@ int unpack_rom_image(char *rom_image)
         return -1;
     }
 
-    if (serialise_raw_data("block header", rom_memory,
+    size_t header_name_size = sizeof("_block_header") + strlen(rom_image_dir);
+    char block_header_name[header_name_size];
+    snprintf(block_header_name, header_name_size, "%s_block_header", rom_image_dir);
+
+    if (serialise_raw_data(block_header_name, rom_memory,
         number_of_blocks * sizeof(rom_block)) == -1) {
         fprintf(stderr, "unpack_rom_image: Could not serialise rom block " \
             "header.\n");
@@ -405,7 +414,6 @@ int unpack_rom_image(char *rom_image)
         }
 
         free(temp_rom_block);
-        //rom_block = NULL;
     }
 
     unmmap_rom_file(rom_memory, file_size);
@@ -414,18 +422,76 @@ int unpack_rom_image(char *rom_image)
     return 0;
 }
 
+
+static uint8_t *desirialise_rom_table(char *rom_header_file)
+{
+    size_t number_of_blocks;
+    rom_block *rom_block_table;
+
+    FILE *input_file = fopen(rom_header_file, "r");
+    if (input_file == NULL) {
+        fprintf(stderr, "desirialise_rom_table: Could not open %s\n",
+            rom_header_file);
+        return NULL;
+    }
+
+    while();
+
+    fclose(input_file);
+    return rom_block_table;
+}
+
 /* Should this be a ini like file or just a text version of the -i option? */
 static int serialise_formatted_rom_block_header(char *rom_header_output_file,
-    rom_block *rom_block, unsigned int number_of_blocks)
+    rom_block *rom_block_table, unsigned int number_of_blocks)
 {
+    FILE *output_file = fopen(rom_header_output_file, "w");
+    if (output_file == NULL) {
+        fprintf(stderr, "serialise_formatted_rom_block_header: Could not " \
+            " create %s.\n", rom_header_output_file);
+        return -1;
+    }
+
+    unsigned int i;
+    for (i = 0; i < number_of_blocks; ++i) {
+        output_rom_block_to_fd(&rom_block_table[i], output_file);
+
+        if (i + 1 == number_of_blocks) {
+            /* Line seperation used to identify new blocks */
+            fprintf(output_file, "\n");
+        }
+    }
+
+    fclose(output_file);
     return 0;
 }
+
+static int output_rom_block_to_fd(rom_block *block, FILE *fd)
+{
+    fprintf(fd, "Block number:               %#x\n", block->block_nr);
+    fprintf(fd, "Encryption flag:            %#x\n", block->flag);
+    fprintf(fd, "Unkown 1:                   %#x\n", block->unk1);
+    fprintf(fd, "Unkown 2:                   %#x\n", block->unk2);
+    fprintf(fd, "Block length plus checksum: %#x\n",
+        le_32_to_be(block->length_plus_cs));
+    fprintf(fd, "Block size:                 %#x\n", le_32_to_be(block->size));
+    fprintf(fd, "Block start address:        %#x\n",
+        le_32_to_be(block->start_address));
+    fprintf(fd, "Block load address:         %#x\n",
+        le_32_to_be(block->load_address));
+    fprintf(fd, "Block execution address:    %#x\n",
+        le_32_to_be(block->execution_address));
+    fprintf(fd, "Unkown 3:                   %#x\n", block->unk3);
+    fprintf(fd, "Block checksum:             %#x\n", block->fstw_plus_cs);
+    return 0;
+}
+
 
 static int serialise_raw_data(char *output_file_name, uint8_t *data,
     unsigned int size_in_bytes)
 {
     int output_file = open(output_file_name, O_CREAT | O_WRONLY |
-        O_TRUNC, 0666);
+        O_TRUNC, 0777);
     if (output_file == -1) {
         fprintf(stderr, "serialise_raw_data: Could not create %s.\n",
             output_file_name);
@@ -443,6 +509,12 @@ static int serialise_raw_data(char *output_file_name, uint8_t *data,
     return 0;
 }
 
+static uint8_t *create_rom_image_from_files(rom_block *table,
+    size_t number_of_blocks)
+{
+
+}
+
 int pack_rom_image(char *rom_image, char *out_file)
 {
     return 0;
@@ -456,7 +528,7 @@ int add_rom_block(char *rom_file, char *block_file)
 static rom_block *create_rom_block_table_from_file(char *table_file,
     unsigned int *number_of_blocks)
 {
-    return NULL;
+
 }
 
 static uint8_t *load_rom_block_from_file(char *rom_file)

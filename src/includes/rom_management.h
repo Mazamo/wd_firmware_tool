@@ -12,10 +12,11 @@
 
 #define FLAG_UNENCRYPTED        0x04
 
+#define SERIALISE_LINES_PER_BLOCK 12
+
 /*
  * Structure used to describe a block of executable firmware code.
  * Source: http://forum.hddguru.com/viewtopic.php?f=13&t=20324&start=40
- * *http://spritesmods.com/?art=hddhack&page=4
  */
 typedef struct __attribute__((packed)) {
 	uint8_t block_nr; /* Number of the block in the table of block structures */
