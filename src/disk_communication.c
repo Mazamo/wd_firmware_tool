@@ -19,6 +19,7 @@
 
 /* Application specific */
 #include "includes/disk_communication.h"
+#include "includes/wd_info.h"
 
 /* Display the model number of the detected hard disk drive. */
 static void display_model(uint8_t *hard_disk_response);
@@ -182,10 +183,22 @@ static void display_number_of_lba_entries(uint8_t *hard_disk_response)
     printf("0x%lx\n", *(uint64_t *) (hard_disk_response + (MAXIMUM_LBA_ENTRY)));
 }
 
+/* Source:
+http://www.t13.org/Documents/UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf */
 int verify_hard_disk_support(uint8_t *hard_disk_response)
 {
     if (hard_disk_response[54] != 'D' || hard_disk_response[55] != 'W'
         || hard_disk_response[57] != 'C') {
+        return -1;
+    }
+
+    if (!strncmp((char *) &hard_disk_response[IDENTIFY_MODEL_NUMBER_START],
+        MODEL_NUMBER, strlen(MODEL_NUMBER))) {
+        return -1;
+    }
+
+    if (!strncmp((char *) &hard_disk_response[IDENTIFY_FIRMWARE_REVISION_START],
+        FIRMWARE_REVISION, strlen(FIRMWARE_REVISION))) {
         return -1;
     }
 
@@ -288,10 +301,8 @@ int get_rom_acces(int hard_disk_file_descriptor, int read_write)
     get_rom_access_cdb[3]     = 0x00; /* Features (8:15): */
     get_rom_access_cdb[4]     = 0xd6; /* Features (0:7): */
     get_rom_access_cdb[5]     = 0x00; /* Sector Count (8:15): */
-    //get_rom_access_cdb[6]     = 0x80; /* Sector Count (0:7): */
     get_rom_access_cdb[6]     = 0x01; /* Sector Count (0:7): */
     get_rom_access_cdb[7]     = 0x00; /* LBA Low (8:15): */
-    //get_rom_access_cdb[8]     = 0xbf; /* LBA Low (0:7): */
     get_rom_access_cdb[8]     = 0xbe; /* LBA Low (0:7): */
     get_rom_access_cdb[9]     = 0x00; /* LBA Mid (8:15): */
     get_rom_access_cdb[10]    = 0x4f; /* LBA Mid (0:7): */
@@ -491,6 +502,11 @@ static inline void display_sense_buffer(unsigned char sense_buffer[32])
     fprintf(stderr, "\n");
 }
 
+/* Sources:
+    https://developer.ibm.com/tutorials/l-scsi-api/
+    https://nl.wikipedia.org/wiki/SCSI
+    https://www.tldp.org/HOWTO/SCSI-Generic-HOWTO/sg_io_hdr_t.html
+*/
 int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     void *response_buffer, size_t response_buffer_size,
     int data_direction)
@@ -511,9 +527,11 @@ int execute_command(unsigned char *cdb, int hard_disk_file_descriptor,
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = SCSI_DEFAULT_TIMEOUT;
 
-    /* Maybe not necessery:
-    http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO/x249.html*/
-    io_hdr.pack_id = calculate_pack_id(cdb);
+    /* Not necessery:
+    http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO/x249.html
+    */
+    //io_hdr.pack_id = calculate_pack_id(cdb);
+    io_hdr.pack_id = 0;
 
     if (ioctl(hard_disk_file_descriptor, SG_IO, &io_hdr) < 0) {
         perror("ioctl: ");

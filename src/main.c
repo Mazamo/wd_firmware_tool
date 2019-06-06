@@ -59,7 +59,26 @@ int main(int argc, char *argv[])
 
         printf("Finished dumping rom from %s\n", argv[3]);
     } else if (strcmp(argv[1], "-l") == 0) {
+		if (argc != 4) {
+			display_options(argv[0]);
+			exit(1);
+		}
 
+		if (getuid() != 0) {
+			fprintf(stderr, "main: Application should be run as root for " \
+				"this operation.\n");
+			exit(1);
+		}
+
+		/* argv[2] = hard disk location */
+		/* argv[3] = input file */
+		if (upload_rom_image(argv[2], argv[3]) == -1) {
+			fprintf(stderr, "main: Could not upload rom image to the hard " \
+				"disk drive.\n");
+			exit(1);
+		}
+
+		printf("Finished uploading rom from %s\n", argv[3]);
     } else if (strcmp(argv[1], "-i") == 0) {
 		if (argc != 3) {
 			display_options(argv[0]);
@@ -72,9 +91,37 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
     } else if (strcmp(argv[1], "-p") == 0) {
+		if (argc != 4) {
+			display_options(argv[0]);
+			exit(1);
+		}
 
-    } else if (strcmp(argv[1], "-a") == 0) {
+		if (pack_rom_image(argv[3], argv[4]) != 0) {
+			fprintf(stderr, "main: Could not pack rom image %s using rom " \
+				"header %s \n", argv[3], argv[4]);
+			exit(1);
+		}
 
+		printf("Successfully packed rom image %s using the %s rom header " \
+			"file \n", argv[4], argv[3]);
+	} else if (strcmp(argv[1], "-m") == 0) {
+		if (argc != 4) {
+			display_options(argv[0]);
+			exit(1);
+		}
+
+		uint32_t address = strtol(argv[3], NULL, 16);
+		uint32_t instruction = strtol(argv[4], NULL, 16);
+		uint32_t instruction_length = strnlen(argv[4], 4);
+
+		if (modify_instruction(argv[2], address, instruction,
+			instruction_length) != 0) {
+			fprintf(stderr, "main: Could not modify an instruction in %s\n",
+				argv[2]);
+			exit(1);
+		}
+
+		printf("Successfully modified an instruction in %s\n", argv[2]);
 	} else if (strcmp(argv[1], "-u") == 0) {
 		if (argc != 3) {
 			display_options(argv[0]);
@@ -85,8 +132,9 @@ int main(int argc, char *argv[])
 		if (unpack_rom_image(argv[2]) != 0) {
 			fprintf(stderr, "main: Could not unpack rom image\n");
 			exit(1);
-		}printf("Finished extracting %s rom image\n", argv[2]);
+		}
 
+		printf("Finished extracting %s rom image\n", argv[2]);
     } else if (strcmp(argv[1], "-s") == 0) {
         if (getuid() != 0) {
             fprintf(stderr, "main: Application should be run as root for " \
@@ -281,9 +329,9 @@ void display_options(char *app_name)
     printf("Print info blocks: %s -i <rom file>\n", app_name);
     printf("Load ROM image: %s -l <hard disk location> <rom file>\n",
 		app_name);
-	printf("Unpack rom image: %s -u <rom file>\n", app_name);
-    printf("Pack image: %s -p <rom file>\n", app_name);
-    printf("Add block: %s -a <rom file> <block file>\n", app_name);
+	printf("Unpack rom image: %s -u <rom file> \n", app_name);
+    printf("Pack image: %s -p <rom file> <output file>\n", app_name);
+	printf("Modify rom: %s -m <rom file>\n", app_name);
     printf("Hard disk scan: %s -s\n", app_name);
     printf("Read specific LBA: %s -r <hard disk location> <block number>\n",
         app_name);

@@ -31,8 +31,6 @@ static uint32_t be_32_to_le(uint32_t integer);
 /* Calculates the checksum (8 or 16 bit) of a code block in the rom file. */
 static unsigned int calculate_rom_block_checksum_8(uint8_t *block,
     unsigned int size);
-static unsigned int calculate_rom_block_checksum_16(uint8_t *block,
-    unsigned int size);
 
 /* Calculates the checksum for a single line of a code block. */
 static unsigned int calculate_line_checksum(uint8_t *block);
@@ -43,7 +41,7 @@ static uint8_t *memory_map_rom_file(char *file_location, int *file_size);
 /* Unload a rom binary file from memory. */
 static inline void unmmap_rom_file(uint8_t *rom_file, unsigned int rom_size);
 
-/* Create rom block table. */
+/* Create rom block table from an in memory representation rom_file. */
 static rom_block *create_rom_block_table(uint8_t *rom_file,
     unsigned int *number_of_blocks);
 
@@ -70,17 +68,17 @@ static int serialise_raw_data(char *output_file_name, uint8_t *data,
 /* Output information of a specified rom_block to a provided file descriptor. */
 static int output_rom_block_to_fd(rom_block *block, FILE *fd);
 
-/* Initialise a rom_block array based on a provided table_file. */
-static rom_block *create_rom_block_table_from_file(char *table_file,
-    unsigned int *number_of_blocks);
+/* Desirialise formatted rom header file. */
+static uint32_t desirialise_rom_table(char *rom_header_file, uint8_t *rom_mem,
+    size_t *number_of_blocks);
 
-/* Load a single block of rom from a provided rom_file.
-*  Note the whole file is read so the rom_file should only contain rom block
-*  content. */
-static uint8_t *load_rom_block_from_file(char *rom_file);
+/* Load a single block of rom from a provided rom_file.*/
+static uint32_t load_rom_block_from_file(char *rom_file, uint8_t *rom_buffer,
+    rom_block *block);
 
-/* Create and verify a rom image based on an init_file. */
-static uint8_t *create_rom_image_from_file(char *init_file);
+/* Create a rom image based on a provided rom_block_table array. */
+static uint32_t create_rom_image(uint8_t *rom_image_buffer,
+    size_t number_of_blocks);
 
 /* Operations: */
 /* Open the hard disk device file */
@@ -278,8 +276,6 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     return 0;
 }
 
-
-/*TODO: Split into seperate functions and add header serialisation logic */
 /* Operations: */
 /* Map contents of rom_image to memory */
 /* Create array of rom header structures */
@@ -321,6 +317,9 @@ int unpack_rom_image(char *rom_image)
     } else {
         rom_image_dir = strtok(temp_string, ".");
     }
+
+    printf("Output directory is: %s\n", temp_string);
+    printf("Output file is: %s\n", copy_file_name);
 
     printf("Mapping %s to memory\n", rom_image);
     if ((rom_memory = memory_map_rom_file(rom_image, &file_size)) == NULL) {
@@ -367,7 +366,7 @@ int unpack_rom_image(char *rom_image)
     }
 
     printf("Writing rom block header to disk.\n");
-    if (serialise_formatted_rom_block_header("formated block header",
+    if (serialise_formatted_rom_block_header("formatted_header",
         rom_header_table, number_of_blocks) == -1) {
         fprintf(stderr, "unpack_rom_image: Could not serialise formatted rom " \
             "block header.\n");
@@ -422,25 +421,6 @@ int unpack_rom_image(char *rom_image)
     return 0;
 }
 
-
-static uint8_t *desirialise_rom_table(char *rom_header_file)
-{
-    size_t number_of_blocks;
-    rom_block *rom_block_table;
-
-    FILE *input_file = fopen(rom_header_file, "r");
-    if (input_file == NULL) {
-        fprintf(stderr, "desirialise_rom_table: Could not open %s\n",
-            rom_header_file);
-        return NULL;
-    }
-
-    while();
-
-    fclose(input_file);
-    return rom_block_table;
-}
-
 /* Should this be a ini like file or just a text version of the -i option? */
 static int serialise_formatted_rom_block_header(char *rom_header_output_file,
     rom_block *rom_block_table, unsigned int number_of_blocks)
@@ -456,7 +436,7 @@ static int serialise_formatted_rom_block_header(char *rom_header_output_file,
     for (i = 0; i < number_of_blocks; ++i) {
         output_rom_block_to_fd(&rom_block_table[i], output_file);
 
-        if (i + 1 == number_of_blocks) {
+        if (i + 1 != number_of_blocks) {
             /* Line seperation used to identify new blocks */
             fprintf(output_file, "\n");
         }
@@ -509,36 +489,230 @@ static int serialise_raw_data(char *output_file_name, uint8_t *data,
     return 0;
 }
 
-static uint8_t *create_rom_image_from_files(rom_block *table,
+/* Operations: */
+/* Open rom_header_file */
+/* Itterate: */
+/* - Read contents of block header description */
+/* - Write block to rom_mom */
+/* - Increase number_of_blocks */
+/* Close rom_header_file */
+static uint32_t desirialise_rom_table(char *rom_header_file, uint8_t *rom_mem,
+    size_t *number_of_blocks)
+{
+    *number_of_blocks = 0;
+    rom_block block = {0};
+    FILE *fp;
+    char *line = NULL;
+    size_t write_offset = 0;
+
+    fp = fopen(rom_header_file, "r");
+    if (fp == NULL) {
+        fprintf(stderr, "desirialise_rom_table: Could not open formatted " \
+            "header\n");
+        return -1;
+    }
+
+    while (getline(&line, 0, fp) != -1) {
+        if (strncmp(line, "Block number:", sizeof("Block number:") - 1) == 0) {
+            block.block_nr  = strtol(line + 28, NULL, 16);
+        }else if (strncmp(line, "Encryption flag:",
+            sizeof("Encryption flag:") - 1) == 0) {
+            block.flag  = strtol(line + 28, NULL, 16);
+        }  else if (strncmp(line, "Unkown 1:", sizeof("Unkown 1:") - 1) == 0) {
+            block.unk1  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Unkown 2:",
+            sizeof("Unkown 2:") - 1) == 0) {
+            block.unk2  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block length plus checksum:",
+            sizeof("Block length plus checksum:") - 1) == 0) {
+            block.length_plus_cs  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block size:",
+            sizeof("Block size:") - 1) == 0) {
+            block.size  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block start address:",
+            sizeof("Block start address:") - 1) == 0) {
+            block.start_address  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block load address:",
+            sizeof("Block load address:") - 1) == 0) {
+            block.load_address  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block execution address:",
+            sizeof("Block execution address:") - 1) == 0) {
+            block.execution_address  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Unkown 3:", sizeof("Unkown 3:") - 1) == 0) {
+            block.unk3  = strtol(line + 28, NULL, 16);
+        } else if (strncmp(line, "Block checksum:",
+            sizeof("Block checksum:") - 1) == 0) {
+            block.fstw_plus_cs  = strtol(line + 28, NULL, 16);
+        }
+
+        if(line[0] == '\n') {
+            memcpy(rom_header_file + write_offset, &block, sizeof(rom_block));
+            memset(&block, 0, sizeof(block));
+            write_offset += sizeof(rom_block);
+            number_of_blocks += 1;
+        }
+    }
+
+    memcpy(rom_header_file + write_offset, &block, sizeof(rom_block));
+    number_of_blocks += 1;
+
+    fclose(fp);
+    if (line != NULL) {
+        free(line);
+    }
+
+    return 0;
+}
+
+int modify_instruction(char *rom_image, uint32_t memory_adress,
+	uint32_t new_instruction, uint32_t instruction_byte_size)
+{
+    int file_size;
+    uint8_t *rom_mem;
+
+    rom_mem = memory_map_rom_file(rom_image, &file_size);
+
+    if (rom_mem == NULL) {
+        fprintf(stderr, "modify_instruction: Could not memory map file.\n");
+        return -1;
+    }
+
+    if (memcpy(rom_mem + memory_adress, &new_instruction,
+        instruction_byte_size) != 0) {
+        perror("memcpy");
+        unmmap_rom_file(rom_mem, file_size);
+        return -1;
+    }
+
+    /* Write rom_mem to file */
+    if (serialise_raw_data(rom_image, rom_mem, file_size) != 0) {
+        fprintf(stderr, "modify_instruction: Could not save modifications");
+        return -1;
+    }
+
+    /* Unnmap rom_mem buffer once done */
+    unmmap_rom_file(rom_mem, file_size);
+
+    return 0;
+}
+
+/* Operations: */
+/* Open rom_file file */
+/* Read rom_block_size from rom_file file descriptor to block */
+/* Close rom_file */
+static uint32_t load_rom_block_from_file(char *rom_file, uint8_t *rom_buffer,
+    rom_block *block)
+{
+    FILE *file;
+    void *write_location = rom_buffer + block->start_address;
+
+    file = fopen(rom_file, "r");
+    if (rom_file == NULL) {
+        perror("load_rom_block_from_file: fopen");
+        return -1;
+    }
+
+    if (fread(write_location, block->length_plus_cs, 1, file) != 0) {
+        perror("load_rom_block_from_file: fread");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+
+    return 0;
+}
+
+/* Operations: */
+/* Create rom memory buffer of size ROM_IMAGE_SIZE */
+/* Call desirialise_rom_table with as parameter the rom_block_format_file */
+/* Call create_rom_image function to place the rom blocks into the rom
+    memory buffer. */
+/* Recalculate checksums for each block and table line */
+/* Create out_file */
+/* Write rom memory buffer to out_file */
+/* Close out_file */
+/* Free contents of rom memory buffer */
+int pack_rom_image(char *rom_header_file, char *out_file)
+{
+    size_t number_of_blocks;
+
+    uint8_t *rom_memory_buffer = calloc(ROM_IMAGE_SIZE, 1);
+    if (rom_memory_buffer == NULL) {
+        perror("pack_rom_image: calloc");
+        return -1;
+    }
+
+    if (desirialise_rom_table(rom_header_file, rom_memory_buffer,
+        &number_of_blocks) != 0) {
+        fprintf(stderr, "pack_rom_image: Could not desirialise rom table\n");
+        free(rom_memory_buffer);
+        return -1;
+    }
+
+    if(create_rom_image(rom_memory_buffer, number_of_blocks) != 0) {
+        fprintf(stderr, "pack_rom_image: Could not create a rom image.\n");
+        free(rom_memory_buffer);
+        return -1;
+    }
+
+    if(serialise_raw_data(out_file, rom_memory_buffer, ROM_IMAGE_SIZE) != 0) {
+        fprintf(stderr, "pack_rom_image: Could not write rom image to disk\n");
+        free(rom_memory_buffer);
+        return -1;
+    }
+
+    unmmap_rom_file(rom_memory_buffer, ROM_IMAGE_SIZE);
+
+    free(rom_memory_buffer);
+    return 0;
+}
+
+
+/* Operations: */
+/* Create rom_image_buffer of size ROM_IMAGE_SIZE */
+/* For each block in rom_block_table: */
+    /* Lookup size of block */
+    /* Lookup offset of block */
+    /* Open file with name 'block_' + block_id */
+    /* Write block to rom_image_buffer at correct offset */
+    /* Close block file */
+static uint32_t create_rom_image(uint8_t *rom_image_buffer,
     size_t number_of_blocks)
 {
+    if (rom_image_buffer == NULL) {
+        perror("calloc");
+        return -1;
+    }
 
-}
+    rom_block *rom_block_table = (rom_block *) rom_image_buffer;
 
-int pack_rom_image(char *rom_image, char *out_file)
-{
+    char rom_block_file_name[] = "block_xx"; /* Placeholder name */
+
+    int i;
+    for (i = 0; i < number_of_blocks; ++i) {
+
+        if ((rom_block_table[i].start_address +
+            rom_block_table[i].length_plus_cs) > ROM_IMAGE_SIZE) {
+            fprintf(stderr, "create_rom_image: rom block %#x is to large\n",
+                rom_block_table[i].block_nr);
+            return -1;
+        }
+
+        /* Construct character string name of the block to append to the
+           buffer. */
+        snprintf(rom_block_file_name + 6, 3, "%x",
+            rom_block_table[i].block_nr);
+
+        if (load_rom_block_from_file(rom_block_file_name, rom_image_buffer,
+            &rom_block_table[i]) != 0) {
+            fprintf(stderr, "Could not copy %s to rom_image_buffer\n",
+                rom_block_file_name);
+            return -1;
+        }
+    }
+
     return 0;
-}
-
-int add_rom_block(char *rom_file, char *block_file)
-{
-    return 0;
-}
-
-static rom_block *create_rom_block_table_from_file(char *table_file,
-    unsigned int *number_of_blocks)
-{
-
-}
-
-static uint8_t *load_rom_block_from_file(char *rom_file)
-{
-    return NULL;
-}
-
-static uint8_t *create_rom_image_from_file(char *init_file)
-{
-    return NULL;
 }
 
 /* Operations: */
@@ -606,7 +780,6 @@ int display_rom_info(char *rom_image)
     int i;
     for (i = 0; i < number_of_headers; ++i) {
         display_rom_block(&rom_header_table[i]);
-
         verify_rom_block_header(&rom_header_table[i]);
         verify_rom_block_contents(rom_memory, &rom_header_table[i]);
         printf("\n");
@@ -621,14 +794,19 @@ int display_rom_info(char *rom_image)
     return 0;
 }
 
-/* Little endian to big endian */
+/* Little endian to big endian.
+ * Source:
+ * https://stackoverflow.com/questions/19275955/convert-little-endian-to-big-endian/19276193 */
 static inline uint32_t le_32_to_be(uint32_t integer)
 {
 	unsigned char *p=(unsigned char*)&integer;
 	return p[0]+(p[1]<<8)+(p[2]<<16)+(p[3]<<24);
 }
 
-/* Big endian to little endian */
+/* Big endian to little endian.
+ * Source:
+ * https://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func
+ */
 static uint32_t be_32_to_le(uint32_t integer)
 {
 	uint32_t ret;
@@ -667,8 +845,9 @@ static int verify_rom_block_header(rom_block *block)
     uint8_t checksum = calculate_line_checksum((uint8_t *) block);
 
     if (checksum != ((uint8_t *) block)[31]) {
-        printf("Rom block checksum FAIL: %#x != %#x\n",
+        fprintf(stderr, "Rom block checksum FAIL: %#x != %#x\n",
             checksum, ((uint8_t *) block)[31]);
+        fprintf(stderr, "Rom block memory is corrupted.\n");
         return -1;
     } else {
         printf("Rom block header checksum OK:   %#x\n", checksum);
@@ -676,6 +855,8 @@ static int verify_rom_block_header(rom_block *block)
     }
 }
 
+/* Check performed to verfiry the integrity of each rom block for memory
+ * corruption. */
 static int verify_rom_block_contents(uint8_t *rom, rom_block *rom_block)
 {
     int checksum;
@@ -687,13 +868,6 @@ static int verify_rom_block_contents(uint8_t *rom, rom_block *rom_block)
 
         rom_contents = rom[rom_block->start_address +
             rom_block->size];
-    } else if ((rom_block->length_plus_cs - rom_block->size) == 2) {
-        checksum = calculate_rom_block_checksum_16(
-            &rom[rom_block->start_address], rom_block->size);
-
-        rom_contents = rom[rom_block->start_address + rom_block->size];
-        rom_contents += rom[rom_block->start_address +
-            rom_block->size + 1] << 8;
     } else {
         fprintf(stderr, "verify_rom_block_contents: Detected irregular " \
             "checksum size.\n");
@@ -728,6 +902,7 @@ static rom_block *create_rom_block_table(uint8_t *rom_file,
     unsigned int table_size;
     int i = 0;
 
+    /* Observed block numbers in the extracted (rom) firmware images. */
     while (((rom_block *) rom_file)[i].block_nr <= 0x0a ||
         ((rom_block *) rom_file)[i].block_nr== 0x5a) {
         ++i;
@@ -754,6 +929,8 @@ static inline void destroy_rom_block_table(rom_block *rom_block_table)
     }
 }
 
+/* https://forum.arduino.cc/index.php?topic=486751.0 */
+/* https://reverseengineering.stackexchange.com/questions/15484/simple-8bit-checksum */
 static unsigned int calculate_rom_block_checksum_8(uint8_t *block,
     unsigned int size)
 {
@@ -761,20 +938,6 @@ static unsigned int calculate_rom_block_checksum_8(uint8_t *block,
     int i;
 
     for (i = 0; i < size; ++i) {
-        checksum += block[i];
-    }
-
-    return checksum;
-}
-
-static unsigned int calculate_rom_block_checksum_16(uint8_t *block,
-    unsigned int size)
-{
-    uint32_t checksum = 0;
-    int i;
-
-    for (i = 0; i < size; ++i) {
-        checksum += block[i + 1] << 8;
         checksum += block[i];
     }
 
