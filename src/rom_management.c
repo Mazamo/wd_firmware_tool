@@ -125,7 +125,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
         return -1;
     }
 
-    printf("Getting access to rom.\n");
+    printf("Getting access to the rom.\n");
     if (get_rom_acces(hdd_fd, ROM_KEY_READ) == -1) {
         fprintf(stderr, "dump_rom_image: Could not get rom read access.\n");
         free(rom_image_buffer);
@@ -136,7 +136,7 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     unsigned int i;
 
     printf("Dumping rom\n");
-    /* Request the ROM image using 64KiB block requests. */
+    /* Request the ROM image using four 64 KiB block requests. */
     for (i = 0; i < ROM_IMAGE_SIZE; i += ROM_IMAGE_BLOCK_SIZE) {
         printf("Dumping ROM block from offset: %d\n", i);
         if (read_rom_block(hdd_fd, &rom_image_buffer[i], ROM_IMAGE_BLOCK_SIZE)
@@ -160,6 +160,8 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
 
     close(hdd_fd);
 
+    /* Can potentially be replaced by serialise_raw_data */
+    /*
     output_file = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (output_file == -1) {
         fprintf(stderr, "dump_rom_image: Could not create %s\n", out_file);
@@ -175,6 +177,14 @@ int dump_rom_image(char *hard_disk_dev_file, char *out_file)
     }
 
     close(output_file);
+    */
+
+    /* Alternative to above ^^ */
+    if (serialise_raw_data(out_file, rom_image_buffer, ROM_IMAGE_SIZE) != 0) {
+        fprintf(stderr, "dump_rom_image: Could not write extracted rom to " \
+            "the disk.\n");
+        return -1;
+    }
 
     return 0;
 }
@@ -219,6 +229,12 @@ int upload_rom_image(char *hard_disk_dev_file, char *in_file)
     input_file = open(in_file, O_RDONLY);
     if (input_file < 0) {
         perror("open");
+        return -1;
+    }
+
+    if (read(input_file, rom_image_buffer, ROM_IMAGE_SIZE) != 0) {
+        perror("read");
+        close(input_file);
         return -1;
     }
 

@@ -53,16 +53,6 @@ int open_hard_disk_drive(char *hard_disk_dev_file)
         return -1;
     }
 
-/* Is not the responsibility of this function. */
-/*
-    if (identify_hard_disk_drive(fd) == -1) {
-        fprintf(stderr, "open_hard_disk_drive: Specified hard disk drive is " \
-            "not supported\n");
-        close(fd);
-        return -1;
-    }
-*/
-
     return fd;
 }
 
@@ -119,6 +109,8 @@ int identify_hard_disk_drive(int hard_disk_file_descriptor)
     return verify_hard_disk_support((uint8_t *) identify_reply_buffer);
 }
 
+/* Source:
+http://www.t13.org/Documents/UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf */
 static void display_model(uint8_t *hard_disk_response)
 {
     printf("Detected hard disk: ");
@@ -137,6 +129,8 @@ static void display_model(uint8_t *hard_disk_response)
     printf("\n");
 }
 
+/* Source:
+http://www.t13.org/Documents/UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf */
 static void display_firmware_revision(uint8_t *hard_disk_response)
 {
     printf("Firmeware revision: ");
@@ -154,6 +148,8 @@ static void display_firmware_revision(uint8_t *hard_disk_response)
     printf("\n");
 }
 
+/* Source:
+http://www.t13.org/Documents/UploadedDocuments/docs2016/di529r14-ATAATAPI_Command_Set_-_4.pdf */
 static void display_serial_number(uint8_t *hard_disk_response)
 {
     printf("Serial number: ");
@@ -236,7 +232,7 @@ int enable_vendor_specific_commands(int hard_disk_file_descriptor)
     if (execute_command(enable_vsc_cdb, hard_disk_file_descriptor,
         NULL, 0, SG_DXFER_NONE) == -1) {
         fprintf(stderr, "enable_vendor_specific_commands: Could not send " \
-            " enable vcs command to hard disk drive.\n");
+            "enable vcs command to hard disk drive.\n");
         return -1;
     }
 
@@ -274,7 +270,7 @@ int disable_vendor_specific_commands(int hard_disk_file_descriptor)
     if (execute_command(disable_vsc_cdb, hard_disk_file_descriptor,
         NULL, 0, SG_DXFER_NONE) == -1) {
         fprintf(stderr, "disable_vendor_specific_commands: Could not send " \
-            " enable vcs command to hard disk drive.\n");
+            "disable vcs command to hard disk drive.\n");
         return -1;
     }
 

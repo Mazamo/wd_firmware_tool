@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    /* Option: Dump */
+    /* Option: Dump rom contents from hard disk drive */
     if (strcmp(argv[1], "-d") == 0) {
         if (argc != 4) {
             display_options(argv[0]);
@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
         }
 
         printf("Finished dumping rom from %s\n", argv[3]);
+	/* Option: Load rom file to hard disk drive */
     } else if (strcmp(argv[1], "-l") == 0) {
 		if (argc != 4) {
 			display_options(argv[0]);
@@ -79,6 +80,7 @@ int main(int argc, char *argv[])
 		}
 
 		printf("Finished uploading rom from %s\n", argv[3]);
+	/* Option: print info rom blocks */
     } else if (strcmp(argv[1], "-i") == 0) {
 		if (argc != 3) {
 			display_options(argv[0]);
@@ -90,6 +92,7 @@ int main(int argc, char *argv[])
 				"provided binary file.\n");
 			exit(1);
 		}
+	/* Option: Pack a rom image based on a rom block table file */
     } else if (strcmp(argv[1], "-p") == 0) {
 		if (argc != 4) {
 			display_options(argv[0]);
@@ -104,6 +107,7 @@ int main(int argc, char *argv[])
 
 		printf("Successfully packed rom image %s using the %s rom header " \
 			"file \n", argv[4], argv[3]);
+	/* Modify instruction in a file */
 	} else if (strcmp(argv[1], "-m") == 0) {
 		if (argc != 4) {
 			display_options(argv[0]);
@@ -122,6 +126,7 @@ int main(int argc, char *argv[])
 		}
 
 		printf("Successfully modified an instruction in %s\n", argv[2]);
+	/* Option: Unpack a rom image */
 	} else if (strcmp(argv[1], "-u") == 0) {
 		if (argc != 3) {
 			display_options(argv[0]);
@@ -135,6 +140,7 @@ int main(int argc, char *argv[])
 		}
 
 		printf("Finished extracting %s rom image\n", argv[2]);
+	/* Option: Scan connected hard disk drives */
     } else if (strcmp(argv[1], "-s") == 0) {
         if (getuid() != 0) {
             fprintf(stderr, "main: Application should be run as root for " \
@@ -143,6 +149,7 @@ int main(int argc, char *argv[])
         }
 
         scan_hard_disk_drives();
+	/* Read LBA from a hard disk drive */
     } else if (strcmp(argv[1], "-r") == 0) {
         if (argc != 4) {
             display_options(argv[0]);
@@ -167,6 +174,7 @@ int main(int argc, char *argv[])
                 argv[3], argv[0]);
             exit(1);
         }
+	/* Write LBA to a hard disk drive */
     } else if (strcmp(argv[1], "-w") == 0) {
         if (argc != 5) {
             printf("%d\n", argc);
