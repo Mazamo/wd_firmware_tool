@@ -10,10 +10,7 @@
  */
 #define ROMTYPE_SPI 0x03
 
-char *supported_hard_disk_drives[] =
-    {
-        "wd800jd",
-        "wd1600aajs",
-    };
+#define MODEL_NUMBER "WDC WD800JD-75MSA3"
+#define FIRMWARE_REVISION "1001.0E.1E41s"
 
 #endif
